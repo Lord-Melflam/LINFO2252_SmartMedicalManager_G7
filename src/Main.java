@@ -86,25 +86,25 @@ public class Main{
     }
 }
 */
-// Main.java (Refactored for maintainability and Lab 3)
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args){
-        // Setup MVC Components
         SmartMedicalModel model = new SmartMedicalModel();
         SmartMedicalView view = new SmartMedicalView();
         SmartMedicalController controller = new SmartMedicalController(model, view);
 
-        // Enable the UI View
         controller.enableUIView();
 
-        // Main command loop
         Scanner in = new Scanner(System.in);
         System.out.println("\nSystem Ready. Enter commands:");
-        System.out.println("UI commands: title <text>, add (button), remove, dark, light");
-        System.out.println("TES commands (placeholder): day, week, event <name>");
+        System.out.println("UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light");
+        System.out.println("TES commands: day, week, event <name>");
         System.out.println("System command: stop");
+        System.out.println("Features available:");
+        for (Feature f : Feature.values()) {
+            System.out.println("Feature: " + f.name());
+        }
 
         while (true) {
             String line = in.nextLine();
@@ -115,7 +115,6 @@ public class Main {
                 System.exit(0);
             }
 
-            // Delegate command handling to the Controller
             controller.handleCommand(line);
         }
     }

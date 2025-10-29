@@ -1,13 +1,17 @@
 // SmartMedicalView.java
 import java.awt.Color;
+import java.awt.event.ActionListener;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 
 public class SmartMedicalView {
     private final JFrame frame;
     private final JPanel panel;
-    private final JButton buttonTemp;
+    private final JButton darkModeButton;
+    private final JTextField inputField;
+    private boolean isDark = false;
 
     public SmartMedicalView() {
         // --- UI Setup ---
@@ -18,10 +22,16 @@ public class SmartMedicalView {
         frame.add(panel);
         frame.setSize(300, 200);
 
-        buttonTemp = new JButton("Dynamic click me");
-        buttonTemp.addActionListener((actionEvent) -> {
+        darkModeButton = new JButton("Dynamic click me");
+        darkModeButton.addActionListener((actionEvent) -> {
+            isDark = !isDark;
+            setDarkMode(isDark);
             System.out.println("dynamic click");
         });
+        frame.add(darkModeButton);
+
+        inputField = new JTextField(16);
+        panel.add(inputField);
     }
 
     public void show() {
@@ -34,39 +44,34 @@ public class SmartMedicalView {
         System.out.println("[View] Hiding the UI (System running in headless/testing mode).");
     }
 
-    // Handles the "title" command - not feature-dependent
     public void setTitle(String title) {
         frame.setTitle(title);
         this.updateUI();
     }
 
-    // Adapts the UI based on DYNAMIC_BUTTON feature state
     public void toggleDynamicButton(boolean isEnabled) {
         if (isEnabled) {
-            if (buttonTemp.getParent() == null) {
-                panel.add(buttonTemp);
+            if (darkModeButton.getParent() == null) {
+                panel.add(darkModeButton);
             }
         } else {
-            panel.remove(buttonTemp);
+            panel.remove(darkModeButton);
         }
         this.updateUI();
     }
 
-    // Adapts the UI based on DARK_MODE feature state
     public void setDarkMode(boolean isDark) {
+        System.out.println("[View] Setting Dark Mode to " + isDark);
         panel.setBackground(isDark ? Color.BLACK : Color.WHITE);
         this.updateUI();
     }
 
-    // Method to force UI refresh after changes
     private void updateUI() {
-        // These calls are essential for Swing to reflect changes dynamically [cite: 24]
         frame.repaint();
         frame.revalidate();
     }
 
     public void updateDisplay(String[] stateLog) {
-        // In a real application, the View would use the Model's state to render the appropriate UI elements.
         System.out.println("\n[View] UPDATING DISPLAY based on new configuration:");
         for (String log : stateLog) {
             System.out.println("  " + log);

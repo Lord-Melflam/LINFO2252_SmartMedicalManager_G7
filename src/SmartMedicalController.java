@@ -20,13 +20,9 @@ public class SmartMedicalController implements ControllerInterface {
         System.out.println("  Deactivate: " + Arrays.toString(deactivations));
         System.out.println("  Activate: " + Arrays.toString(activations));
 
-        // Attempt to apply change in the model
         boolean success = model.applyFeatureChange(deactivations, activations);
-
         if (success) {
-            // SUCCESS: Adapt the View based on the new active features
             if (isUIViewEnabled) {
-                // UI Feature Adaptation (Directly tells the View how to change)
                 for (String name : activations) {
                     if (name.equals("DYNAMIC_BUTTON")) view.toggleDynamicButton(true);
                     if (name.equals("DARK_MODE")) view.setDarkMode(true);
@@ -83,6 +79,7 @@ public class SmartMedicalController implements ControllerInterface {
     public void handleCommand(String commandLine) {
         String[] cutLine = commandLine.split(" ", 2);
         String command = cutLine[0];
+        String arguments = (cutLine.length > 1) ? cutLine[1] : "";
 
         switch (command) {
             case "title":
@@ -91,29 +88,72 @@ public class SmartMedicalController implements ControllerInterface {
                 System.out.println("[Controller] Title set to: " + title);
                 break;
 
-            case "add": // Corresponds to activating DYNAMIC_BUTTON
+            case "add":
                 activate(new String[]{}, new String[]{"DYNAMIC_BUTTON"});
                 break;
 
-            case "remove": // Corresponds to deactivating DYNAMIC_BUTTON
+            case "remove":
                 activate(new String[]{"DYNAMIC_BUTTON"}, new String[]{});
                 break;
 
-            case "dark": // Corresponds to activating DARK_MODE
+            case "activate":
+                String toActivate[] = arguments.isEmpty() ? new String[]{} : arguments.split(" ");
+                activate(new String[]{}, toActivate);
+                break;
+
+            case "deactivate":
+                String toDeactivate[] = arguments.isEmpty() ? new String[]{} : arguments.split(" ");
+                activate(toDeactivate, new String[]{});
+                break;
+
+            case "dark":
                 activate(new String[]{}, new String[]{"DARK_MODE"});
                 break;
 
-            case "light": // Corresponds to deactivating DARK_MODE
+            case "light":
                 activate(new String[]{"DARK_MODE"}, new String[]{});
                 break;
 
             case "day":
+                TimeEventSystem.getInstance().advanceDays(1);
+                break;
+
             case "week":
+                TimeEventSystem.getInstance().advanceDays(7);
+                break;
+
             case "event":
-                // Placeholder for Lab 3 Time Event System (TES) commands
-                System.out.println("[Controller] Time/Event command received: " + commandLine);
-                // Here you would call a model.advanceTime(command) or model.triggerEvent()
-                // and then call model.getCurrentStateLog() to check system reaction.
+                if (!arguments.isEmpty()) {
+                    try {
+                        TimeEvent ev = TimeEvent.valueOf(arguments.trim());
+                        TimeEventSystem.getInstance().triggerEvent(ev);
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("[Controller] Unknown event: " + arguments);
+                    }
+                } else {
+                    System.out.println("[Controller] event requires an argument: DOCTOR_UNAVAILABLE | USER_ILL");
+                }
+                break;
+
+            // small helper for testing appointments: dayaddappt <patient> <offsetDays>
+            case "dayaddappt":
+                if (!arguments.isEmpty()) {
+                    String[] parts = arguments.split(" ");
+                    if (parts.length >= 2) {
+                        String patient = parts[0];
+                        try {
+                            int offset = Integer.parseInt(parts[1]);
+                            int day = TimeEventSystem.getInstance().getCurrentDay() + offset;
+                            model.addAppointment(patient, day);
+                        } catch (NumberFormatException nfe) {
+                            System.out.println("[Controller] Invalid offset: " + parts[1]);
+                        }
+                    } else {
+                        System.out.println("[Controller] Usage: dayaddappt <patient> <offsetDays>");
+                    }
+                } else {
+                    System.out.println("[Controller] Usage: dayaddappt <patient> <offsetDays>");
+                }
                 break;
 
             default:
