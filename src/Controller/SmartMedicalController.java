@@ -5,11 +5,8 @@ import Model.SmartMedicalModel;
 import Model.TimeEvent;
 import Model.TimeEventSystem;
 import View.SmartMedicalView;
-import Controller.ControllerInterface;
-
-import java.util.Arrays;
-
 import Logger.Logger;
+import java.util.Arrays;
 
 public class SmartMedicalController implements ControllerInterface {
     private boolean isUIViewEnabled = false;

@@ -1,11 +1,15 @@
 package View;
 // SmartMedicalView.java
+import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.event.ActionListener;
+import java.awt.FlowLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.JTextArea;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
 
 import Logger.Logger;   
 
