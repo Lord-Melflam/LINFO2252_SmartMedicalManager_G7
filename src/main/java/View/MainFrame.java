@@ -5,17 +5,24 @@ import Model.TimeEventSystem;
 import javax.swing.JOptionPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.DefaultTableModel;
+import java.util.UUID;
 import java.awt.event.ActionEvent;
 import java.util.Date;
 import java.util.List;
 import Model.Appointment;
+import java.time.LocalDate;
+import com.github.weisj.darklaf.LafManager;
+import com.github.weisj.darklaf.theme.Theme;
+import Logger.Logger;
 
 public class MainFrame extends javax.swing.JFrame {
 
-    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MainFrame.class.getName());
-    private static SmartMedicalController controller = SmartMedicalController.getInstance();
-    private static TimeEventSystem timeEventSystem = TimeEventSystem.getInstance();
-    private static SmartMedicalView view = SmartMedicalView.getInstance();
+        private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MainFrame.class.getName());
+        private final Logger appLogger = Logger.getInstance();
+        private static SmartMedicalController controller = SmartMedicalController.getInstance();
+        private static TimeEventSystem timeEventSystem = TimeEventSystem.getInstance();
+        private java.util.List<Appointment> currentAppointments = new java.util.ArrayList<>();
+
 
     /**
      * Creates new form MainFrame
@@ -34,6 +41,7 @@ public class MainFrame extends javax.swing.JFrame {
         private void refreshAppointmentsTable() {
                 try {
                         List<Appointment> appts = controller.getFutureAppointments();
+                        currentAppointments = appts;
                         String[] cols = new String[]{"Day", "Patient", "Status", "Result"};
                         DefaultTableModel m = new DefaultTableModel(cols, 0) {
                                 @Override
@@ -402,7 +410,7 @@ public class MainFrame extends javax.swing.JFrame {
 
         consultationType.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Surgery", "Dentist", "Type1", "Type2", "Type3" }));
         consultationType.addActionListener(this::consultationTypeActionPerformed);
-
+        
         jLabel7.setText("Consultation Type");
 
         jLabel8.setText("Location");
@@ -649,7 +657,7 @@ public class MainFrame extends javax.swing.JFrame {
 
         jScrollPane1.setViewportView(featurePanel);
 
-        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>());
 
         jLabel1.setText("Theme");
 
@@ -762,51 +770,121 @@ public class MainFrame extends javax.swing.JFrame {
     }// </editor-fold>
 
     private void searchBarActionPerformed(ActionEvent actionEvent) {
-                String query = searchBar.getText();
-                JOptionPane.showMessageDialog(this, "Search requested: " + query + "\nSearch/filter not implemented.", "Search", JOptionPane.INFORMATION_MESSAGE);
+                                // trigger filter/search when Enter pressed in search bar
+                                String filter = timePeriodList.getSelectedValue();
+                                String query = searchBar.getText();
+                                try { appLogger.log("View", "Search triggered: filter=" + filter + " query=" + query); } catch (Exception ignored) {}
+                                refreshAppointmentsTableFiltered(filter, query);
     }
+
+        private void refreshAppointmentsTableFiltered(String filter, String query) {
+                try {
+                        java.util.List<Appointment> appts;
+                        if (filter == null || filter.isEmpty() || filter.equals("All Upcoming")) {
+                                appts = controller.getFutureAppointments();
+                        } else if (filter.equals("Today")) {
+                                int today = timeEventSystem.getCurrentDay();
+                                appts = new java.util.ArrayList<>();
+                                for (Appointment a : controller.getFutureAppointments()) if (a.getDay() == today) appts.add(a);
+                        } else if (filter.equals("This Week")) {
+                                int today = timeEventSystem.getCurrentDay();
+                                appts = new java.util.ArrayList<>();
+                                for (Appointment a : controller.getFutureAppointments()) if (a.getDay() >= today && a.getDay() < today + 7) appts.add(a);
+                        } else if (filter.equals("Past Appointments")) {
+                                appts = controller.getPastAppointments();
+                        } else {
+                                appts = controller.getFutureAppointments();
+                        }
+
+                        // apply text search if provided (search patient name)
+                        String q = (query == null) ? "" : query.trim().toLowerCase();
+                        String[] cols = new String[]{"Day", "Patient", "Status", "Result"};
+                        javax.swing.table.DefaultTableModel m = new javax.swing.table.DefaultTableModel(cols, 0) {
+                                @Override
+                                public boolean isCellEditable(int row, int column) { return false; }
+                        };
+                        // remember the list currently displayed so selection maps to ids
+                        currentAppointments = appts;
+                        for (Appointment a : appts) {
+                                if (!q.isEmpty() && !a.getPatient().toLowerCase().contains(q)) continue;
+                                String status = a.isCancelled() ? "Cancelled" : "Scheduled";
+                                m.addRow(new Object[]{"Day " + a.getDay(), a.getPatient(), status, a.getResult()});
+                        }
+                        appointmentsTable.setModel(m);
+                        appointmentsTable.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+                } catch (Exception e) {
+                        logger.severe("refreshAppointmentsTableFiltered failed: " + e.getMessage());
+                }
+        }
 
     private void button1ActionPerformed(java.awt.event.ActionEvent evt) {
                 int sel = appointmentsTable.getSelectedRow();
+                try { appLogger.log("View", "button1 (modify/cancel) pressed, selectedRow=" + sel); } catch (Exception ignored) {}
                 if (sel < 0) {
                         JOptionPane.showMessageDialog(this, "Select an appointment in the Appointments tab to modify/cancel.", "No selection", JOptionPane.INFORMATION_MESSAGE);
                         return;
                 }
-                boolean res = controller.cancelAppointment(sel);
+                java.util.UUID id = null;
+                if (sel >= 0 && sel < currentAppointments.size()) id = currentAppointments.get(sel).getId();
+                if (id == null) {
+                        JOptionPane.showMessageDialog(this, "Unable to identify selected appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                }
+                boolean res = controller.cancelAppointmentById(id);
                 if (res) {
+                        try { appLogger.log("View", "Appointment cancelled by button1, row=" + sel); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Appointment cancelled.", "Cancelled", JOptionPane.INFORMATION_MESSAGE);
                         refreshAppointmentsTable();
                 } else {
+                        try { appLogger.log("View", "Failed to cancel appointment by button1, row=" + sel); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Failed to cancel appointment.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
     }
 
     private void button2ActionPerformed(java.awt.event.ActionEvent evt) {
                 int sel = appointmentsTable.getSelectedRow();
+                try { appLogger.log("View", "button2 (modify/cancel) pressed, selectedRow=" + sel); } catch (Exception ignored) {}
                 if (sel < 0) {
                         JOptionPane.showMessageDialog(this, "Select an appointment in the Appointments tab to modify/cancel.", "No selection", JOptionPane.INFORMATION_MESSAGE);
                         return;
                 }
-                boolean res = controller.cancelAppointment(sel);
+                java.util.UUID id = null;
+                if (sel >= 0 && sel < currentAppointments.size()) id = currentAppointments.get(sel).getId();
+                if (id == null) {
+                        JOptionPane.showMessageDialog(this, "Unable to identify selected appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                }
+                boolean res = controller.cancelAppointmentById(id);
                 if (res) {
+                        try { appLogger.log("View", "Appointment cancelled by button2, row=" + sel); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Appointment cancelled.", "Cancelled", JOptionPane.INFORMATION_MESSAGE);
                         refreshAppointmentsTable();
                 } else {
+                        try { appLogger.log("View", "Failed to cancel appointment by button2, row=" + sel); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Failed to cancel appointment.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
     }
 
     private void button3ActionPerformed(java.awt.event.ActionEvent evt) {
                 int sel = appointmentsTable.getSelectedRow();
+                try { appLogger.log("View", "button3 (modify/cancel) pressed, selectedRow=" + sel); } catch (Exception ignored) {}
                 if (sel < 0) {
                         JOptionPane.showMessageDialog(this, "Select an appointment in the Appointments tab to modify/cancel.", "No selection", JOptionPane.INFORMATION_MESSAGE);
                         return;
                 }
-                boolean res = controller.cancelAppointment(sel);
+                java.util.UUID id = null;
+                if (sel >= 0 && sel < currentAppointments.size()) id = currentAppointments.get(sel).getId();
+                if (id == null) {
+                        JOptionPane.showMessageDialog(this, "Unable to identify selected appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                }
+                boolean res = controller.cancelAppointmentById(id);
                 if (res) {
+                        try { appLogger.log("View", "Appointment cancelled by button3, row=" + sel); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Appointment cancelled.", "Cancelled", JOptionPane.INFORMATION_MESSAGE);
                         refreshAppointmentsTable();
                 } else {
+                        try { appLogger.log("View", "Failed to cancel appointment by button3, row=" + sel); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Failed to cancel appointment.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
     }
@@ -844,15 +922,28 @@ public class MainFrame extends javax.swing.JFrame {
 
                                                 String patient = "UI_User"; // adapt to auth/user model when available
                                                 int day = timeEventSystem.getCurrentDay() + offsetDays;
+                                                try { appLogger.log("View", "Book requested: patient=" + patient + " dateMs=" + selected.getTime() + " offsetDays=" + offsetDays + " day=" + day); } catch (Exception ignored) {}
 
-                                                boolean ok = controller.addAppointmentDirect(patient, day);
+                                                boolean ok = controller.addAppointmentDirect(patient, day); // maybe not the best function to use...
                                                 if (ok) {
-                                                        JOptionPane.showMessageDialog(this, "Appointment requested for " + patient + " (day: " + day + ")", "Booked", JOptionPane.INFORMATION_MESSAGE);
-                                                        refreshAppointmentsTable();
+                                                                try { appLogger.log("View", "Book succeeded: patient=" + patient + " day=" + day); } catch (Exception ignored) {}
+                                                                JOptionPane.showMessageDialog(this, "Appointment requested for " + patient + " (day: " + day + ")", "Booked", JOptionPane.INFORMATION_MESSAGE);
+                                                                // refresh and go back to appointments view so user sees the new entry
+                                                                refreshAppointmentsTable();
+                                                                try {
+                                                                        bookPanel.setVisible(false);
+                                                                        appointmentsView.setVisible(true);
+                                                                        appointmentsTab.revalidate();
+                                                                        appointmentsTab.repaint();
+                                                                } catch (Exception ex) {
+                                                                        logger.severe("Failed to switch back to appointments view: " + ex.getMessage());
+                                                                }
                                                 } else {
+                                                        try { appLogger.log("View", "Book failed: patient=" + patient + " day=" + day); } catch (Exception ignored) {}
                                                         JOptionPane.showMessageDialog(this, "Failed to add appointment.", "Error", JOptionPane.ERROR_MESSAGE);
                                                 }
                 } catch (Exception e) {
+                        try { appLogger.log("View", "Book exception: " + e.getMessage()); } catch (Exception ignored) {}
                         JOptionPane.showMessageDialog(this, "Failed to book appointment: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                         logger.severe("Book failed: " + e.getMessage());
                 }
@@ -863,27 +954,99 @@ public class MainFrame extends javax.swing.JFrame {
     }
 
     private void newBtnActionPerformed(java.awt.event.ActionEvent evt) {
-        // TODO add your handling code here:
+                // Show booking panel
+                try {
+                        try { appLogger.log("View", "Open booking panel"); } catch (Exception ignored) {}
+                        appointmentsView.setVisible(false);
+                        bookPanel.setVisible(true);
+                        appointmentsTab.revalidate();
+                        appointmentsTab.repaint();
+                } catch (Exception e) {
+                        logger.severe("Failed to open booking panel: " + e.getMessage());
+                }
     }
 
     private void modifyBtnActionPerformed(java.awt.event.ActionEvent evt) {
-        // TODO add your handling code here:
+                int sel = appointmentsTable.getSelectedRow();
+                try { appLogger.log("View", "Modify requested, selectedRow=" + sel); } catch (Exception ignored) {}
+                if (sel < 0) {
+                        JOptionPane.showMessageDialog(this, "Select an appointment to modify.", "No selection", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                }
+
+                String input = JOptionPane.showInputDialog(this, "Enter new day (integer) to reschedule appointment:", "Reschedule", JOptionPane.PLAIN_MESSAGE);
+                if (input == null) return; // cancelled
+                try {
+                        int newDay = Integer.parseInt(input.trim());
+                        try { appLogger.log("View", "Reschedule requested: row=" + sel + " newDay=" + newDay); } catch (Exception ignored) {}
+                        java.util.UUID id = null;
+                        if (sel >= 0 && sel < currentAppointments.size()) id = currentAppointments.get(sel).getId();
+                        if (id == null) {
+                            JOptionPane.showMessageDialog(this, "Unable to identify selected appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                        // convert integer day to LocalDate relative to TES current day
+                        LocalDate newDate = LocalDate.now().plusDays((long)newDay - timeEventSystem.getCurrentDay());
+                        boolean ok = controller.rescheduleAppointment(id, newDate);
+                        if (ok) {
+                                try { appLogger.log("View", "Reschedule succeeded: row=" + sel + " newDay=" + newDay); } catch (Exception ignored) {}
+                                JOptionPane.showMessageDialog(this, "Appointment rescheduled to day " + newDay, "Rescheduled", JOptionPane.INFORMATION_MESSAGE);
+                                refreshAppointmentsTable();
+                        } else {
+                                try { appLogger.log("View", "Reschedule failed: row=" + sel + " newDay=" + newDay); } catch (Exception ignored) {}
+                                JOptionPane.showMessageDialog(this, "Failed to reschedule appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                } catch (NumberFormatException nfe) {
+                        JOptionPane.showMessageDialog(this, "Invalid day value.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
     }
 
     private void cancelAppBtnActionPerformed(java.awt.event.ActionEvent evt) {
-        // TODO add your handling code here:
+                int sel = appointmentsTable.getSelectedRow();
+                try { appLogger.log("View", "Cancel requested via toolbar, selectedRow=" + sel); } catch (Exception ignored) {}
+                if (sel < 0) {
+                        JOptionPane.showMessageDialog(this, "Select an appointment to cancel.", "No selection", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                }
+                java.util.UUID id = null;
+                if (sel >= 0 && sel < currentAppointments.size()) id = currentAppointments.get(sel).getId();
+                if (id == null) {
+                        JOptionPane.showMessageDialog(this, "Unable to identify selected appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                }
+                boolean res = controller.cancelAppointmentById(id);
+                if (res) {
+                        try { appLogger.log("View", "Cancel succeeded via toolbar, row=" + sel); } catch (Exception ignored) {}
+                        JOptionPane.showMessageDialog(this, "Appointment cancelled.", "Cancelled", JOptionPane.INFORMATION_MESSAGE);
+                        refreshAppointmentsTable();
+                } else {
+                        try { appLogger.log("View", "Cancel failed via toolbar, row=" + sel); } catch (Exception ignored) {}
+                        JOptionPane.showMessageDialog(this, "Failed to cancel appointment.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
     }
 
     private void applyFilterBtnActionPerformed(java.awt.event.ActionEvent evt) {
-        // TODO add your handling code here:
+                String filter = timePeriodList.getSelectedValue();
+                String query = searchBar.getText();
+                try { appLogger.log("View", "Apply filter: " + filter + " query=" + query); } catch (Exception ignored) {}
+                refreshAppointmentsTableFiltered(filter, query);
     }
 
     private void cancelBtnActionPerformed(java.awt.event.ActionEvent evt) {
-        // TODO add your handling code here:
+                // Back from booking panel to appointments view
+                try {
+                        bookPanel.setVisible(false);
+                        appointmentsView.setVisible(true);
+                        appointmentsTab.revalidate();
+                        appointmentsTab.repaint();
+                } catch (Exception e) {
+                        logger.severe("Failed to go back to appointments view: " + e.getMessage());
+                }
     }
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {
-        // TODO add your handling code here:
+                // Another back/close button behaviour: same as cancelBtn
+                cancelBtnActionPerformed(evt);
     }
 
 

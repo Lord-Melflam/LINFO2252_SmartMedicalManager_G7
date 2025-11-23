@@ -10,6 +10,10 @@ import Model.TimeEvent;
 import Model.TimeEventSystem;
 import View.SmartMedicalView;
 import java.util.List;
+import java.time.LocalDate;
+import java.util.UUID;
+
+import com.github.weisj.darklaf.theme.Theme;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -104,8 +108,7 @@ public class SmartMedicalController implements ControllerInterface {
         commands.put("help", args -> {
             printHelp(logger);
         });
-
-        // Notifications CLI commands
+        
         commands.put("notifications", args -> {
             java.util.List<Notification> list = getNotifications();
             if (list.isEmpty()) {
@@ -201,24 +204,55 @@ public class SmartMedicalController implements ControllerInterface {
     }
 
     /**
+     * New API: add an appointment by LocalDate, returning the UUID of the created appointment.
+     */
+    public UUID addAppointment(LocalDate date, String patient) {
+        try {
+            UUID id = model.addAppointment(date, patient);
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Added appointment (by date) for " + patient + " on " + date + " id=" + id);
+            return id;
+        } catch (Exception e) {
+            logger.error("Controller", "addAppointment failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Return a copy of future appointments for UI display.
      */
     public List<Appointment> getFutureAppointments() {
-        return model.getFutureAppointments();
+        java.util.List<Appointment> list = model.getFutureAppointments();
+        logger.log("Controller", "getFutureAppointments: returning " + list.size() + " appointments");
+        return list;
+    }
+
+    /**
+     * Return past appointments from model.
+     */
+    public java.util.List<Appointment> getPastAppointments() {
+        java.util.List<Appointment> list = model.getPastAppointments();
+        logger.log("Controller", "getPastAppointments: returning " + list.size() + " appointments");
+        return list;
     }
 
     /**
      * Notifications API
      */
     public java.util.List<Notification> getNotifications() {
-        return model.getNotifications();
+        java.util.List<Notification> list = model.getNotifications();
+        logger.log("Controller", "getNotifications: returning " + list.size() + " notifications");
+        return list;
     }
 
     public java.util.List<Notification> getUnreadNotifications() {
-        return model.getUnreadNotifications();
+        java.util.List<Notification> list = model.getUnreadNotifications();
+        logger.log("Controller", "getUnreadNotifications: returning " + list.size() + " notifications");
+        return list;
     }
 
     public boolean markNotificationRead(String id) {
+        logger.log("Controller", "markNotificationRead requested: " + id);
         boolean res = model.markNotificationRead(id);
         if (res) {
             if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
@@ -232,16 +266,65 @@ public class SmartMedicalController implements ControllerInterface {
         if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
     }
 
-    /**
-     * Cancel appointment by index (as returned by {@link #getFutureAppointments()}).
-     */
-    public boolean cancelAppointment(int index) {
-        boolean res = model.cancelAppointment(index);
+    /* Themes API */
+    public List<Theme> getAvailableThemes() {
+        java.util.List<Theme> list = model.getAvailableThemes();
+        logger.log("Controller", "getAvailableThemes: returning " + list.size() + " themes");
+        return list;
+    }
+
+    public boolean addTheme(Theme theme) {
+        logger.log("Controller", "addTheme requested: " + theme);
+        boolean res = model.addTheme(theme);
         if (res) {
             if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
-            logger.log("Controller", "Cancelled appointment index: " + index);
+            logger.log("Controller", "Theme added: " + theme);
+        }
+        return res;
+    }
+
+    public Theme getActiveTheme() {
+        return model.getActiveTheme();
+    }
+
+    public boolean setActiveTheme(Theme theme) {
+        logger.log("Controller", "setActiveTheme requested: " + theme);
+        boolean res = model.setActiveTheme(theme);
+        if (res) {
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Active theme set to: " + theme);
+        }
+        return res;
+    }
+
+    /**
+     * Cancel appointment by UUID.
+     */
+    public boolean cancelAppointmentById(UUID id) {
+        logger.log("Controller", "cancelAppointmentById requested: " + id);
+        boolean res = model.cancelAppointmentById(id);
+        if (res) {
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Cancelled appointment id: " + id);
         } else {
-            logger.error("Controller", "Failed to cancel appointment index: " + index);
+            logger.error("Controller", "Failed to cancel appointment id: " + id);
+        }
+        return res;
+    }
+
+    
+
+    /**
+     * Reschedule appointment by UUID to a new LocalDate.
+     */
+    public boolean rescheduleAppointment(UUID id, LocalDate newDate) {
+        logger.log("Controller", "rescheduleAppointment requested: " + id + " -> " + newDate);
+        boolean res = model.rescheduleAppointmentById(id, newDate);
+        if (res) {
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Rescheduled appointment id " + id + " -> " + newDate);
+        } else {
+            logger.error("Controller", "Failed to reschedule appointment id: " + id);
         }
         return res;
     }

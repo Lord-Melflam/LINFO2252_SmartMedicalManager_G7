@@ -2,8 +2,12 @@ package Model;
 // SmartMedicalModel.java
 
 import Logger.Logger;
+import com.github.weisj.darklaf.LafManager;
+import com.github.weisj.darklaf.theme.DarculaTheme;
+import com.github.weisj.darklaf.theme.Theme;
 
 import java.util.*;
+import java.time.LocalDate;
 
 public class SmartMedicalModel implements TimeEventListener {
     private static SmartMedicalModel instance;
@@ -11,6 +15,8 @@ public class SmartMedicalModel implements TimeEventListener {
     private final ArrayList<Appointment> futureAppointments = new ArrayList<>();
     private final ArrayList<Appointment> pastAppointments = new ArrayList<>();
     private final ArrayList<Notification> notifications = new ArrayList<>();
+    private final List<Theme> themes = new ArrayList<>();
+    private Theme activeTheme = new DarculaTheme();
 
     private final Logger logger = Logger.getInstance();
     private final TimeEventSystem tes = TimeEventSystem.getInstance();
@@ -18,6 +24,44 @@ public class SmartMedicalModel implements TimeEventListener {
     public SmartMedicalModel() {
         activeFeatures.addAll(Feature.getMandatoryFeatures());
         tes.registerListener(this);
+        // Initialize themes
+        for (Theme t : LafManager.getRegisteredThemes()) {
+            themes.add(t);
+        }
+    }
+
+    // Themes API
+    public synchronized java.util.List<Theme> getAvailableThemes() {
+        return new ArrayList<>(themes);
+    }
+
+    public synchronized boolean addTheme(Theme theme) {
+        if (theme == null) return false;
+        if (themes.contains(theme)) return false;
+        themes.add(theme);
+        logger.log("Model", "Theme added: " + theme.getName());
+        return true;
+    }
+
+    public synchronized boolean removeTheme(Theme theme) {
+        if (theme == null) return false;
+        boolean res = themes.remove(theme);
+        if (res) logger.log("Model", "Theme removed: " + theme.getName());
+        return res;
+    }
+
+    public synchronized Theme getActiveTheme() {
+        return activeTheme;
+    }
+
+    public synchronized boolean setActiveTheme(Theme theme) {
+        if (theme == null || !themes.contains(theme)) {
+            logger.error("Model", "setActiveTheme: unknown theme " + theme);
+            return false;
+        }
+        activeTheme = theme;
+        logger.log("Model", "Active theme set to: " + theme);
+        return true;
     }
 
     public static SmartMedicalModel getInstance() {
@@ -32,11 +76,22 @@ public class SmartMedicalModel implements TimeEventListener {
     public synchronized void addAppointment(String patient, int day) {
         Appointment a = new Appointment(day, patient);
         futureAppointments.add(a);
-        futureAppointments.sort(Comparator.comparingInt(app -> app.getDay()));
+        futureAppointments.sort(Comparator.comparing(Appointment::getDate));
 
         logger.log("Model", "Added appointment: " + a);
-        // create a user-visible notification
-        addNotification("Appointment added for " + patient + " on day " + day);
+        addNotification("Appointment added for " + patient + " on day " + day + " (" + a.getDate() + ")");
+    }
+
+    /**
+     * New API: add appointment by LocalDate, returns the generated UUID for the appointment.
+     */
+    public synchronized java.util.UUID addAppointment(LocalDate date, String patient) {
+        Appointment a = new Appointment(date, patient);
+        futureAppointments.add(a);
+        futureAppointments.sort(Comparator.comparing(Appointment::getDate));
+        logger.log("Model", "Added appointment: " + a);
+        addNotification("Appointment added for " + patient + " on " + date);
+        return a.getId();
     }
 
     /**
@@ -45,6 +100,43 @@ public class SmartMedicalModel implements TimeEventListener {
      */
     public synchronized java.util.List<Appointment> getFutureAppointments() {
         return new ArrayList<>(futureAppointments);
+    }
+
+    /**
+     * Return a copy of past appointments.
+     */
+    public synchronized java.util.List<Appointment> getPastAppointments() {
+        return new ArrayList<>(pastAppointments);
+    }
+
+    /**
+     * Reschedule a future appointment by index to a new day.
+     * Returns true if successful.
+     */
+    public synchronized boolean rescheduleAppointment(int index, int newDay) {
+        if (index < 0 || index >= futureAppointments.size()) {
+            logger.error("Model", "rescheduleAppointment: invalid index " + index);
+            return false;
+        }
+        Appointment a = futureAppointments.get(index);
+        if (a.isCancelled()) {
+            logger.error("Model", "rescheduleAppointment: appointment is cancelled " + a);
+            return false;
+        }
+        // create a new Appointment with the new day but keep patient and result/history/cancel state
+        Appointment newA = new Appointment(newDay, a.getPatient());
+        newA.setResult(a.getResult());
+        // preserve cancelled/history flags if applicable
+        if (a.isHistory()) newA.setHistory(true);
+        if (a.isCancelled()) newA.setCancelled(true);
+
+        futureAppointments.remove(index);
+        futureAppointments.add(newA);
+        futureAppointments.sort(Comparator.comparing(Appointment::getDate));
+
+        logger.log("Model", "Rescheduled appointment: " + a + " -> " + newA);
+        addNotification("Appointment for " + a.getPatient() + " rescheduled to day " + newDay + " (" + newA.getDate() + ")");
+        return true;
     }
 
     /**
@@ -63,8 +155,55 @@ public class SmartMedicalModel implements TimeEventListener {
         }
         a.setCancelled(true);
         logger.log("Model", "Cancelled appointment: " + a);
-        addNotification("Appointment cancelled for " + a.getPatient() + " scheduled day " + a.getDay());
+        addNotification("Appointment cancelled for " + a.getPatient() + " scheduled day " + a.getDay() + " (" + a.getDate() + ")");
         return true;
+    }
+
+    /**
+     * Cancel appointment by UUID. Returns true if found and cancelled.
+     */
+    public synchronized boolean cancelAppointmentById(java.util.UUID id) {
+        for (Appointment a : futureAppointments) {
+            if (a.getId().equals(id)) {
+                if (a.isCancelled()) {
+                    logger.log("Model", "cancelAppointmentById: already cancelled " + a);
+                    return false;
+                }
+                a.setCancelled(true);
+                logger.log("Model", "Cancelled appointment: " + a);
+                addNotification("Appointment cancelled for " + a.getPatient() + " on " + a.getDate());
+                return true;
+            }
+        }
+        logger.error("Model", "cancelAppointmentById: not found " + id);
+        return false;
+    }
+
+    /**
+     * Reschedule appointment by UUID to a new LocalDate.
+     */
+    public synchronized boolean rescheduleAppointmentById(java.util.UUID id, LocalDate newDate) {
+        for (int i = 0; i < futureAppointments.size(); i++) {
+            Appointment a = futureAppointments.get(i);
+            if (a.getId().equals(id)) {
+                if (a.isCancelled()) {
+                    logger.error("Model", "rescheduleAppointmentById: appointment is cancelled " + a);
+                    return false;
+                }
+                Appointment newA = new Appointment(newDate, a.getPatient());
+                newA.setResult(a.getResult());
+                if (a.isHistory()) newA.setHistory(true);
+                if (a.isCancelled()) newA.setCancelled(true);
+
+                futureAppointments.set(i, newA);
+                futureAppointments.sort(Comparator.comparing(Appointment::getDate));
+                logger.log("Model", "Rescheduled appointment: " + a + " -> " + newA);
+                addNotification("Appointment for " + a.getPatient() + " rescheduled to " + newDate);
+                return true;
+            }
+        }
+        logger.error("Model", "rescheduleAppointmentById: not found " + id);
+        return false;
     }
 
     /**
@@ -239,7 +378,7 @@ public class SmartMedicalModel implements TimeEventListener {
             return;
         }
 
-        Appointment earliest = futureAppointments.getFirst();
+        Appointment earliest = futureAppointments.get(0);
         // futureAppointments is sorted by day by default so no need to search
         // for (Appointment a : futureAppointments) if (a.getDay() < earliest.getDay()) earliest = a;
 

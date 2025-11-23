@@ -6,16 +6,12 @@ import Logger.Logger;
 import javax.swing.*;
 
 import com.github.weisj.darklaf.LafManager;
-import com.github.weisj.darklaf.theme.DarculaTheme;
-import com.github.weisj.darklaf.theme.IntelliJTheme;
 import com.github.weisj.darklaf.theme.Theme;
 
 public class SmartMedicalView {
     private static final Logger logger = Logger.getInstance();
     private static SmartMedicalView instance;
-    private MainFrame mainFrame = new MainFrame();
-    private final Theme darkTheme = new DarculaTheme();
-    private final Theme lightTheme = new IntelliJTheme();
+    private MainFrame mainFrame = null;
 
     public SmartMedicalView() {
         SwingUtilities.invokeLater(this::createForm);
@@ -59,24 +55,46 @@ public class SmartMedicalView {
 
     public void hide() {
         SwingUtilities.invokeLater(() -> {
-            if (mainFrame != null) mainFrame.setVisible(false);
+            if (mainFrame == null) mainFrame = new MainFrame();
+            mainFrame.setVisible(false);
         });
         logger.log("View", "Hiding the UI (System running in headless/testing mode).");
     }
 
     public void setTitle(String title) {
-        SwingUtilities.invokeLater(() -> mainFrame.setTitle(title));
+        SwingUtilities.invokeLater(() -> {
+            if (mainFrame == null) mainFrame = new MainFrame();
+            mainFrame.setTitle(title);
+        });
         logger.log("View", "Setting Title: " + title);
     }
 
     public void setDarkMode(boolean isDark) {
         SwingUtilities.invokeLater(() -> {
-            if (isDark) {
-                LafManager.setTheme(darkTheme);
-            } else {
-                LafManager.setTheme(lightTheme);
+            try {
+                Theme[] registered = LafManager.getRegisteredThemes();
+                Theme pick = null;
+                if (registered != null) {
+                    for (Theme t : registered) {
+                        String n = (t.getName() == null) ? "" : t.getName().toLowerCase();
+                        if (isDark) {
+                            if (n.contains("dark") || n.contains("darcula") || n.contains("dracula")) {
+                                pick = t;
+                                break;
+                            }
+                        } else {
+                            if (n.contains("light") || n.contains("intellij") || n.contains("idea")) {
+                                pick = t;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (pick != null) LafManager.setTheme(pick);
+                LafManager.install();
+            } catch (Exception e) {
+                logger.error("View", "setDarkMode failed: " + e.getMessage());
             }
-            LafManager.install();
         });
         logger.log("View", "Setting Dark Mode to " + isDark);
     }
