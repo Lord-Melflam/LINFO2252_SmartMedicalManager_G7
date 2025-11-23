@@ -1,7 +1,6 @@
 import Controller.SmartMedicalController;
 import Logger.Logger;
 import Model.Feature;
-import View.MainFrame;
 
 import java.util.Scanner;
 
@@ -9,22 +8,12 @@ public class Main {
     private static Logger logger = Logger.getInstance();
     private static SmartMedicalController controller = SmartMedicalController.getInstance();
 
-    private static void printInfo() {
+    public static void printInfo() {
         logger.log("System", "System Ready. Enter commands:");
-        logger.log("System", "UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light");
-        logger.log("System", "TES commands: day, week, event <name>");
-        logger.log("System", "System command: stop");
-        logger.log("System", "Features available:");
-        for (Feature f : Feature.values()) {
-            logger.log("System", "Feature: " + f.name());
-        }
+        controller.printHelp(logger);
     }
 
-    public static void main(String[] args) {
-        MainFrame.main(args);
-
-        controller.enableUIView();
-
+    private static void commandLoop() {
         Scanner in = new Scanner(System.in);
         printInfo();
 
@@ -39,5 +28,10 @@ public class Main {
 
             controller.handleCommand(line);
         }
+    }
+
+    public static void main(String[] args) {
+        controller.enableUIView();
+        commandLoop();
     }
 }

@@ -2,12 +2,15 @@ package Controller;
 // SmartMedicalController.java
 
 import Logger.Logger;
+import Model.Feature;
 import Model.SmartMedicalModel;
 import Model.TimeEvent;
 import Model.TimeEventSystem;
 import View.SmartMedicalView;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SmartMedicalController implements ControllerInterface {
     private static SmartMedicalController instance;
@@ -16,9 +19,12 @@ public class SmartMedicalController implements ControllerInterface {
     private final SmartMedicalView view = SmartMedicalView.getInstance();
     private final SmartMedicalModel model = SmartMedicalModel.getInstance();
     private final TimeEventSystem tes = TimeEventSystem.getInstance();
+
     private boolean isUIViewEnabled = false;
+    private final Map<String, Command> commands = new HashMap<>();
 
     public SmartMedicalController() {
+        initCommands();
     }
 
     public static SmartMedicalController getInstance() {
@@ -28,6 +34,83 @@ public class SmartMedicalController implements ControllerInterface {
             }
         }
         return instance;
+    }
+
+    private void initCommands() {
+        commands.put("title", args -> {
+            String title = args.isEmpty() ? "Application" : args;
+            view.setTitle(title);
+            logger.log("Controller", "Title set to: " + title);
+        });
+
+        commands.put("add", args -> activate(new String[]{}, new String[]{"DYNAMIC_BUTTON"}));
+
+        commands.put("remove", args -> activate(new String[]{"DYNAMIC_BUTTON"}, new String[]{}));
+
+        commands.put("activate", args -> {
+            String[] toActivate = args.isEmpty() ? new String[]{} : args.split(" ");
+            activate(new String[]{}, toActivate);
+        });
+
+        commands.put("deactivate", args -> {
+            String[] toDeactivate = args.isEmpty() ? new String[]{} : args.split(" ");
+            activate(toDeactivate, new String[]{});
+        });
+
+        commands.put("dark", args -> activate(new String[]{}, new String[]{"DARK_MODE"}));
+
+        commands.put("light", args -> activate(new String[]{"DARK_MODE"}, new String[]{}));
+
+        commands.put("day", args -> tes.advanceDays(1));
+
+        commands.put("week", args -> tes.advanceDays(7));
+
+        commands.put("event", args -> {
+            if (!args.isEmpty()) {
+                try {
+                    TimeEvent ev = TimeEvent.valueOf(args.trim());
+                    tes.triggerEvent(ev);
+                } catch (IllegalArgumentException e) {
+                    logger.error("Controller", "Unknown event: " + args);
+                }
+            } else {
+                logger.error("Controller", "event requires an argument: DOCTOR_UNAVAILABLE | USER_ILL");
+            }
+        });
+
+        commands.put("dayaddappt", args -> {
+            if (!args.isEmpty()) {
+                String[] parts = args.split(" ");
+                if (parts.length >= 2) {
+                    String patient = parts[0];
+                    try {
+                        int offset = Integer.parseInt(parts[1]);
+                        int day = tes.getCurrentDay() + offset;
+                        model.addAppointment(patient, day);
+                    } catch (NumberFormatException nfe) {
+                        logger.error("Controller", "Invalid offset: " + parts[1]);
+                    }
+                } else {
+                    logger.error("Controller", "Usage: dayaddappt <patient> <offsetDays>");
+                }
+            } else {
+                logger.error("Controller", "Usage: dayaddappt <patient> <offsetDays>");
+            }
+        });
+
+        commands.put("help", args -> {
+            printHelp(logger);
+        });
+    }
+
+    public static void printHelp(Logger logger) {
+        logger.log("System", "UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light");
+        logger.log("System", "TES commands: day, week, event <name>");
+        logger.log("System", "System command: stop");
+        logger.log("System", "Features available:");
+        for (Feature f : Feature.values()) {
+            logger.log("System", "Feature: " + f.name());
+        }
     }
 
     /**
@@ -41,17 +124,17 @@ public class SmartMedicalController implements ControllerInterface {
         if (success) {
             if (isUIViewEnabled) {
                 for (String name : activations) {
-                    if (name.equals("DYNAMIC_BUTTON")) view.toggleDynamicButton(true);
+                    //if (name.equals("DYNAMIC_BUTTON")) view.toggleDynamicButton(true);
                     if (name.equals("DARK_MODE")) view.setDarkMode(true);
                 }
                 for (String name : deactivations) {
-                    if (name.equals("DYNAMIC_BUTTON")) view.toggleDynamicButton(false);
+                    //if (name.equals("DYNAMIC_BUTTON")) view.toggleDynamicButton(false);
                     if (name.equals("DARK_MODE")) view.setDarkMode(false);
                 }
 
                 view.updateDisplay(model.getCurrentStateLog());
             }
-            logger.log("Controller", "Feature change successful.");
+            logger.log("Controller", "Feature change successful, activated : " + Arrays.toString(activations) + ", deactivated: " + Arrays.toString(deactivations));
             return 0;
         } else {
             logger.error("Controller", "Feature activation FAILED.");
@@ -92,88 +175,21 @@ public class SmartMedicalController implements ControllerInterface {
      * Handles command line input and delegates logic to the activate method or the view.
      */
     public void handleCommand(String commandLine) {
+        if (commandLine == null || commandLine.trim().isEmpty()) {
+            logger.error("Controller", "Empty command received.");
+            return;
+        }
+
         String[] cutLine = commandLine.split(" ", 2);
         String command = cutLine[0];
         String arguments = (cutLine.length > 1) ? cutLine[1] : "";
 
-        switch (command) {
-            case "title":
-                String title = (cutLine.length > 1) ? cutLine[1] : "Application";
-                view.setTitle(title);
-                logger.log("Controller", "Title set to: " + title);
-                break;
-
-            case "add":
-                activate(new String[]{}, new String[]{"DYNAMIC_BUTTON"});
-                break;
-
-            case "remove":
-                activate(new String[]{"DYNAMIC_BUTTON"}, new String[]{});
-                break;
-
-            case "activate":
-                String toActivate[] = arguments.isEmpty() ? new String[]{} : arguments.split(" ");
-                activate(new String[]{}, toActivate);
-                break;
-
-            case "deactivate":
-                String toDeactivate[] = arguments.isEmpty() ? new String[]{} : arguments.split(" ");
-                activate(toDeactivate, new String[]{});
-                break;
-
-            case "dark":
-                activate(new String[]{}, new String[]{"DARK_MODE"});
-                break;
-
-            case "light":
-                activate(new String[]{"DARK_MODE"}, new String[]{});
-                break;
-
-            case "day":
-                tes.advanceDays(1);
-                break;
-
-            case "week":
-                tes.advanceDays(7);
-                break;
-
-            case "event":
-                if (!arguments.isEmpty()) {
-                    try {
-                        TimeEvent ev = TimeEvent.valueOf(arguments.trim());
-                        tes.triggerEvent(ev);
-                    } catch (IllegalArgumentException e) {
-                        logger.error("Controller", "Unknown event: " + arguments);
-                    }
-                } else {
-                    logger.error("Controller", "event requires an argument: DOCTOR_UNAVAILABLE | USER_ILL");
-                }
-                break;
-
-            // small helper for testing appointments: dayaddappt <patient> <offsetDays>
-            case "dayaddappt":
-                if (!arguments.isEmpty()) {
-                    String[] parts = arguments.split(" ");
-                    if (parts.length >= 2) {
-                        String patient = parts[0];
-                        try {
-                            int offset = Integer.parseInt(parts[1]);
-                            int day = tes.getCurrentDay() + offset;
-                            model.addAppointment(patient, day);
-                        } catch (NumberFormatException nfe) {
-                            logger.error("Controller", "Invalid offset: " + parts[1]);
-                        }
-                    } else {
-                        logger.error("Controller", "Usage: dayaddappt <patient> <offsetDays>");
-                    }
-                } else {
-                    logger.error("Controller", "Usage: dayaddappt <patient> <offsetDays>");
-                }
-                break;
-
-            default:
-                logger.error("Controller", "Unknown command " + command);
-                break;
+        Command handler = commands.get(command);
+        if (handler != null) {
+            handler.execute(arguments);
+        }
+        else {
+            logger.error("Controller", "Unknown command " + command);
         }
     }
 }
