@@ -31,11 +31,15 @@ public enum Feature {
     }
 
     public static List<Feature> getMandatoryFeatures() {
-        return List.of(APPOINTMENTS, MEDICAL_HISTORY, INSURANCE_LEVELS);
+        return List.of(APPOINTMENTS, MEDICAL_HISTORY, INSURANCE_LEVELS, PAYMENTS);
     }
 
     public static boolean isMandatory(Feature feature) {
         return getMandatoryFeatures().contains(feature);
+    }
+
+    public static boolean isOptional(Feature feature) {
+        return !isMandatory(feature);
     }
 
     @Override

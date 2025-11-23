@@ -8,17 +8,14 @@ import java.util.*;
 public class SmartMedicalModel implements TimeEventListener {
     private static SmartMedicalModel instance;
     private final Set<Feature> activeFeatures = new HashSet<>();
-    private final List<Appointment> futureAppointments = new ArrayList<>();
-    private final List<Appointment> pastAppointments = new ArrayList<>();
+    private final ArrayList<Appointment> futureAppointments = new ArrayList<>();
+    private final ArrayList<Appointment> pastAppointments = new ArrayList<>();
 
     private final Logger logger = Logger.getInstance();
     private final TimeEventSystem tes = TimeEventSystem.getInstance();
 
     public SmartMedicalModel() {
-        activeFeatures.add(Feature.APPOINTMENTS);
-        activeFeatures.add(Feature.MEDICAL_HISTORY);
-        activeFeatures.add(Feature.INSURANCE_LEVELS);
-
+        activeFeatures.addAll(Feature.getMandatoryFeatures());
         tes.registerListener(this);
     }
 

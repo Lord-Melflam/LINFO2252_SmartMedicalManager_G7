@@ -9,28 +9,9 @@ import java.awt.*;
 public class SmartMedicalView {
     private static final Logger logger = Logger.getInstance();
     private static SmartMedicalView instance;
-    private final JFrame frame;
-    private final JPanel panel;
-    private final JButton darkModeButton;
-    private final JTextField inputField;
 
     public SmartMedicalView() {
-        // --- UI Setup ---
-        frame = new JFrame("Application");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        panel = new JPanel();
-        frame.add(panel);
-        frame.setSize(800, 600);
-
-        darkModeButton = new JButton("Dynamic click me");
-        darkModeButton.addActionListener((finalactionEvent) -> {
-            logger.log("View", "Dynamic button clicked.");
-        });
-        frame.add(darkModeButton);
-
-        inputField = new JTextField(16);
-        panel.add(inputField);
+        MainFrame.main(null);
     }
 
     public static SmartMedicalView getInstance() {

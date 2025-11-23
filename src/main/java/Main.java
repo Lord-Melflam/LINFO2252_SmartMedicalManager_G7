@@ -1,6 +1,7 @@
 import Controller.SmartMedicalController;
 import Logger.Logger;
 import Model.Feature;
+import View.MainFrame;
 
 import java.util.Scanner;
 
@@ -20,6 +21,8 @@ public class Main {
     }
 
     public static void main(String[] args) {
+        MainFrame.main(args);
+
         controller.enableUIView();
 
         Scanner in = new Scanner(System.in);
