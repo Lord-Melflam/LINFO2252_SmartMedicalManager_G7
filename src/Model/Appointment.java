@@ -1,4 +1,5 @@
 package Model;
+
 // Appointment.java
 public class Appointment {
     private final int day;

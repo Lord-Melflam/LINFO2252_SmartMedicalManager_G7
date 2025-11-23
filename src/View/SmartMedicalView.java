@@ -1,22 +1,14 @@
 package View;
 // SmartMedicalView.java
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.JTextArea;
-import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
 
-import Logger.Logger;   
+import Logger.Logger;
+
+import javax.swing.*;
+import java.awt.*;
 
 public class SmartMedicalView {
-    private static SmartMedicalView instance;
     private static final Logger logger = Logger.getInstance();
-    
+    private static SmartMedicalView instance;
     private final JFrame frame;
     private final JPanel panel;
     private final JButton darkModeButton;

@@ -26,11 +26,6 @@ public enum Feature {
         this.description = description;
     }
 
-    @Override
-    public String toString() {
-        return description;
-    }
-
     public static List<Feature> getAllFeatures() {
         return List.of(Feature.values());
     }
@@ -41,6 +36,11 @@ public enum Feature {
 
     public static boolean isMandatory(Feature feature) {
         return getMandatoryFeatures().contains(feature);
+    }
+
+    @Override
+    public String toString() {
+        return description;
     }
 
     public boolean isMandatory() {

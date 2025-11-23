@@ -1,8 +1,8 @@
-import java.util.Scanner;
-
 import Controller.SmartMedicalController;
-import Model.Feature;
 import Logger.Logger;
+import Model.Feature;
+
+import java.util.Scanner;
 
 public class Main {
     private static Logger logger = Logger.getInstance();
@@ -19,7 +19,7 @@ public class Main {
         }
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         controller.enableUIView();
 
         Scanner in = new Scanner(System.in);

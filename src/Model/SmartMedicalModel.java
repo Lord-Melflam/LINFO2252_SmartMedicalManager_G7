@@ -1,7 +1,9 @@
 package Model;
 // SmartMedicalModel.java
-import java.util.*;
+
 import Logger.Logger;
+
+import java.util.*;
 
 public class SmartMedicalModel implements TimeEventListener {
     private static SmartMedicalModel instance;
@@ -33,14 +35,15 @@ public class SmartMedicalModel implements TimeEventListener {
         Appointment a = new Appointment(day, patient);
         futureAppointments.add(a);
         futureAppointments.sort(Comparator.comparingInt(app -> app.getDay()));
-        
+
         logger.log("Model", "Added appointment: " + a);
     }
 
     /**
      * Attempts to change the set of active features, enforcing feature constraints.
+     *
      * @param toDeactivate Features to turn off.
-     * @param toActivate Features to turn on.
+     * @param toActivate   Features to turn on.
      * @return true if the configuration change is valid and applied, false otherwise.
      */
     public boolean applyFeatureChange(String[] toDeactivate, String[] toActivate) {

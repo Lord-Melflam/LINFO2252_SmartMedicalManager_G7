@@ -1,10 +1,11 @@
 package Model;
 // TimeEventSystem.java
+
+import Logger.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-
-import Logger.Logger;
 
 public class TimeEventSystem {
     private static TimeEventSystem instance;
@@ -14,7 +15,8 @@ public class TimeEventSystem {
 
     private Logger logger = Logger.getInstance();
 
-    private TimeEventSystem() {}
+    private TimeEventSystem() {
+    }
 
     public static TimeEventSystem getInstance() {
         if (instance == null) {
@@ -47,7 +49,9 @@ public class TimeEventSystem {
     public void advanceDays(int days) {
         if (days <= 0) return;
         for (int i = 0; i < days; i++) {
-            synchronized (this) { currentDay++; }
+            synchronized (this) {
+                currentDay++;
+            }
             notifyListeners(TimeEvent.DAY_PASSED, 1);
 
             if (rng.nextDouble() < 0.10) notifyListeners(TimeEvent.DOCTOR_UNAVAILABLE, 0);
@@ -71,11 +75,14 @@ public class TimeEventSystem {
 
     private void notifyListeners(TimeEvent event, int daysAdvanced) {
         List<TimeEventListener> snapshot;
-        synchronized (this) { snapshot = new ArrayList<>(listeners); }
+        synchronized (this) {
+            snapshot = new ArrayList<>(listeners);
+        }
         for (TimeEventListener l : snapshot) {
-            try { l.onTimeEvent(event, daysAdvanced); }
-            catch (Exception e) { 
-                logger.log("TES", "listener error: " + e.getMessage()); 
+            try {
+                l.onTimeEvent(event, daysAdvanced);
+            } catch (Exception e) {
+                logger.log("TES", "listener error: " + e.getMessage());
             }
         }
     }

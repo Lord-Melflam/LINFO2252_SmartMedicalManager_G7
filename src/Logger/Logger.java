@@ -8,10 +8,10 @@ import java.time.format.DateTimeFormatter;
 
 public class Logger {
     private static Logger instance;
+    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private PrintWriter fileWriter;
     private boolean logToFile = false;
     private boolean logToConsole = true;
-    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private Logger() {
         enableFileLogging("app.log");
@@ -30,6 +30,7 @@ public class Logger {
 
     /**
      * Enable logging to a file
+     *
      * @param filepath Path to the log file
      */
     public synchronized void enableFileLogging(String filepath) {
@@ -62,17 +63,18 @@ public class Logger {
 
     /**
      * Log a message with a component tag
+     *
      * @param component The component generating the log (e.g., "Controller", "Model", "View", "TES")
-     * @param message The message to log
+     * @param message   The message to log
      */
     public synchronized void log(String component, String message) {
         String timestamp = LocalDateTime.now().format(timeFormatter);
         String formattedMessage = String.format("[%s] [%s] %s", timestamp, component, message);
-        
+
         if (logToConsole) {
             System.out.println(formattedMessage);
         }
-        
+
         if (logToFile && fileWriter != null) {
             fileWriter.println(formattedMessage);
         }
@@ -84,11 +86,11 @@ public class Logger {
     public synchronized void error(String component, String message) {
         String timestamp = LocalDateTime.now().format(timeFormatter);
         String formattedMessage = String.format("[%s] [%s] ERROR: %s", timestamp, component, message);
-        
+
         if (logToConsole) {
             System.err.println(formattedMessage);
         }
-        
+
         if (logToFile && fileWriter != null) {
             fileWriter.println(formattedMessage);
         }

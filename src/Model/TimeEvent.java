@@ -1,4 +1,5 @@
 package Model;
+
 // TimeEvent.java
 public enum TimeEvent {
     DAY_PASSED,

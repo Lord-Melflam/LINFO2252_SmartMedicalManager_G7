@@ -1,23 +1,25 @@
 package Controller;
 // SmartMedicalController.java
 
+import Logger.Logger;
 import Model.SmartMedicalModel;
 import Model.TimeEvent;
 import Model.TimeEventSystem;
 import View.SmartMedicalView;
-import Logger.Logger;
+
 import java.util.Arrays;
 
 public class SmartMedicalController implements ControllerInterface {
-    private boolean isUIViewEnabled = false;
     private static SmartMedicalController instance;
     // singleton instances
     private final Logger logger = Logger.getInstance();
     private final SmartMedicalView view = SmartMedicalView.getInstance();
-    private final SmartMedicalModel model = SmartMedicalModel.getInstance(); 
+    private final SmartMedicalModel model = SmartMedicalModel.getInstance();
     private final TimeEventSystem tes = TimeEventSystem.getInstance();
+    private boolean isUIViewEnabled = false;
 
-    public SmartMedicalController() {}
+    public SmartMedicalController() {
+    }
 
     public static SmartMedicalController getInstance() {
         if (instance == null) {

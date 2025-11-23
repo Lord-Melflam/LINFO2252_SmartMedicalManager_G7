@@ -1,21 +1,21 @@
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.*;
-import java.io.File;
+
 import Controller.ControllerInterface;
 import Controller.SmartMedicalController;
 
+import java.io.*;
+import java.util.*;
+
 public class TestingToolRunner {
 
-    /** The "generateTests" method should not be reimplemented nor modified.
+    /**
+     * The "generateTests" method should not be reimplemented nor modified.
      * It uses the Generation Testing Tool in the TestingTool folder, the feature model written in featureModelPath
+     *
      * @param testingToolFolder the name of the folder where the tool is located
-     * @param featureModelPath the path to the feature model.
-     * @param reference writes tests and register logs with this reference, overwrites the previous tests generated with this reference. Use a different reference to preserve previous tests and logs.
+     * @param featureModelPath  the path to the feature model.
+     * @param reference         writes tests and register logs with this reference, overwrites the previous tests generated with this reference. Use a different reference to preserve previous tests and logs.
      * @return true if the generation was a success, else false.
      */
     public static boolean generateTests(String featureModelPath, String testingToolFolder, int reference, boolean usingWindows) throws Exception {
@@ -44,12 +44,14 @@ public class TestingToolRunner {
         }
     }
 
-    /** The "executeTests" method should not be reimplemented nor modified.
+    /**
+     * The "executeTests" method should not be reimplemented nor modified.
      * It reads the test suite at "reference" in folder "testingToolFolder", and writes the logs in this same folder and at the same reference.
      * The (de)activations and logs are requested at the "controller".
-     * @param reference writes tests and register logs with this reference, overwrites the previous tests generated with this reference. Use a different reference to preserve previous tests and logs.
+     *
+     * @param reference         writes tests and register logs with this reference, overwrites the previous tests generated with this reference. Use a different reference to preserve previous tests and logs.
      * @param testingToolFolder the path to the folder where the test suites are stored
-     * @param controller an instance of ControllerInterface to (de)activate features
+     * @param controller        an instance of ControllerInterface to (de)activate features
      * @return The number of alternative paths that were executed, or 0 if there was a problem.
      */
     public static int executeTests(ControllerInterface controller, String testingToolFolder, int reference) {
@@ -58,7 +60,7 @@ public class TestingToolRunner {
         // Searches for the number of alternative paths, the number in the first line of each test suite.
         String firstPath = testingToolFolder + "paths" + reference + "-0.txt";
         int numberPaths;
-        try(BufferedReader br = new BufferedReader(new FileReader(firstPath))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(firstPath))) {
             numberPaths = Integer.parseInt(br.readLine());
         } catch (IOException e) {
             e.printStackTrace();
@@ -66,7 +68,7 @@ public class TestingToolRunner {
         }
 
         // Searches for existing logs at this reference. If they exist, wipe them.
-        for(int i = 0; i<numberPaths; i++) {
+        for (int i = 0; i < numberPaths; i++) {
             File file = new File(testingToolFolder + "logs" + reference + "-" + i + ".txt");
             if (file.exists()) {
                 try {
@@ -81,12 +83,12 @@ public class TestingToolRunner {
         }
 
         // Reads each alternative path and creates logs for each of them consecutively.
-        for(int j = 0; j<numberPaths; j++) {
+        for (int j = 0; j < numberPaths; j++) {
             String path = testingToolFolder + "paths" + reference + "-" + j + ".txt";
             String line;
             int stepCounter = 0;
 
-            try(BufferedReader br = new BufferedReader(new FileReader(path))) {
+            try (BufferedReader br = new BufferedReader(new FileReader(path))) {
 
                 // Number of paths
                 br.readLine();
@@ -128,10 +130,10 @@ public class TestingToolRunner {
                             System.out.println("It occurred in: test reference " + reference + ", path number " + j + ", after " + stepCounter + " system verification(s).");
                             return 0;
                         }
-                    // This system state will be compared to others in alternative execution paths.
+                        // This system state will be compared to others in alternative execution paths.
                     } else if (line.equals("BREAKPOINT")) {
                         stepCounter++;
-                        TestingToolRunner.writeStateToFile(controller, testingToolFolder+"logs"+reference+"-"+j+".txt");
+                        TestingToolRunner.writeStateToFile(controller, testingToolFolder + "logs" + reference + "-" + j + ".txt");
                     }
 
                 }
@@ -157,7 +159,7 @@ public class TestingToolRunner {
         int stepCounter = 0;
         try (BufferedReader br = new BufferedReader(new FileReader(path))) {
             // The first six lines are: number of paths, undetectable transition rate, four lines that define the initial state.
-            for(int i = 0; i<6; i++) {
+            for (int i = 0; i < 6; i++) {
                 br.readLine();
             }
 
@@ -185,10 +187,12 @@ public class TestingToolRunner {
         return null;
     }
 
-    /** The "verifyLogs" method should not be modified, apart from the information put in "discrepancies" if you wish to change it.
+    /**
+     * The "verifyLogs" method should not be modified, apart from the information put in "discrepancies" if you wish to change it.
      * This method reads the logs from 0 to "numberPaths", tagged with "reference", in folder "testingToolFolder".
+     *
      * @param numberPaths an integer corresponding to the number of paths
-     * @param reference writes tests and register logs with this reference, overwrites the previous tests generated with this reference. Use a different reference to preserve previous tests and logs.
+     * @param reference   writes tests and register logs with this reference, overwrites the previous tests generated with this reference. Use a different reference to preserve previous tests and logs.
      * @return Discrepancies between logs if they exist, or an empty String.
      */
     public static List<String> verifyLogs(String testingToolFolder, int reference, int numberPaths) {
@@ -197,27 +201,27 @@ public class TestingToolRunner {
         List<List<String[]>> allLogs = new ArrayList<List<String[]>>();
 
         // Reads all logs from files
-        for (int i = 0; i<numberPaths; i++) {
+        for (int i = 0; i < numberPaths; i++) {
             String path = testingToolFolder + "logs" + reference + "-" + i + ".txt";
             allLogs.add(readStatesFromFile(path));
         }
 
         // Compares each list of logs. At the same point in time, the logs should be the same.
-        for (int i = 0; i<allLogs.get(0).size(); i++) {
+        for (int i = 0; i < allLogs.get(0).size(); i++) {
             List<String[]> currentLogs = new ArrayList<>();
-            for (int j = 0; j<allLogs.size(); j++) {
+            for (int j = 0; j < allLogs.size(); j++) {
                 currentLogs.add(allLogs.get(j).get(i));
             }
             // System.out.println(Arrays.toString(currentLogs.get(0)));
             String[] firstLog = currentLogs.get(0);
-            for(int j=1;j<currentLogs.size();j++) {
+            for (int j = 1; j < currentLogs.size(); j++) {
                 String[] nextLog = currentLogs.get(j);
                 // System.out.println(Arrays.toString(nextLog));
                 boolean discrepancy = compareLogs(firstLog, nextLog);
 
                 if (discrepancy) {
                     String newDiscrepancy = "\n ==================================================";
-                    newDiscrepancy += "\nReference "+reference+", at step " + i + ", between path 0 and alternative path "+j + ", logs are inconsistent. Logs are :\n";
+                    newDiscrepancy += "\nReference " + reference + ", at step " + i + ", between path 0 and alternative path " + j + ", logs are inconsistent. Logs are :\n";
                     newDiscrepancy += Arrays.toString(firstLog) + "\n VS \n" + Arrays.toString(nextLog);
                     newDiscrepancy += "\n --------------------------------------------------";
                     newDiscrepancy += "\n These logs were created after the following transition: ";
@@ -289,7 +293,7 @@ public class TestingToolRunner {
      * The "writeStateToFile" method should not be reimplemented nor modified.
      * It uses the "controller" to get the state as logs and writes them.
      *
-     * @param filename is the name of the file where the logs are written.
+     * @param filename   is the name of the file where the logs are written.
      * @param controller is an instance of ControllerInterface and controls your system.
      */
     public static void writeStateToFile(ControllerInterface controller, String filename) throws IOException {
@@ -309,7 +313,7 @@ public class TestingToolRunner {
             FileWriter writer = new FileWriter(filename, true);
 
             for (String line : state) {
-                writer.write(line+"\n");
+                writer.write(line + "\n");
                 writer.write("LINEMARKER\n");
             }
             writer.write("ENDSTATE\n");
@@ -322,8 +326,9 @@ public class TestingToolRunner {
         }
     }
 
-    /** You can modify this method to omit specific lines in your logs, for example those with timestamps, to avoid false positives.
-     *
+    /**
+     * You can modify this method to omit specific lines in your logs, for example those with timestamps, to avoid false positives.
+     * <p>
      * This method is responsible for checking consistency between logs. It verifies if discrepancies are found between logs1 and logs2.
      *
      * @param logs1 First logs to be compared
@@ -351,11 +356,13 @@ public class TestingToolRunner {
         return !(set1.equals(set2) && logs1.length == logs2.length);
     }
 
-    /** The "launchTestingTool" method can be modified.
+    /**
+     * The "launchTestingTool" method can be modified.
      * This method generates tests, executes them through a Controller, and verifies the generated logs for consistency.
-     * @param controller is an instance of ControllerInterface and controls your system.
+     *
+     * @param controller        is an instance of ControllerInterface and controls your system.
      * @param testingToolFolder is the path to the folder containing your testing tool (GenerationTestingTool), and where your test suites and logs will be stored.
-     * @param featureModelPath is the complete path to your feature model (e.g. "./features.txt" if it is in your root folder)
+     * @param featureModelPath  is the complete path to your feature model (e.g. "./features.txt" if it is in your root folder)
      */
     public static void launchTestingTool(ControllerInterface controller, String testingToolFolder, String featureModelPath, boolean skipGeneration, int reference, boolean usingWindows) throws Exception {
 
@@ -374,7 +381,7 @@ public class TestingToolRunner {
         // Checks if the logs in the alternative paths are the same.
         // You can modify the function "compareLogs" if you want to add custom rules, such as omitting timestamps in your logs.
         List<String> discrepancies = verifyLogs(testingToolFolder, reference, numberOfPaths);
-        for(String line : discrepancies) {
+        for (String line : discrepancies) {
             System.out.println(line);
         }
     }
