@@ -1,0 +1,229 @@
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- AUTOMATIC_RESCHEDULING (Automatic Rescheduling on Doctor Unavailability)
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- REMINDERS (Medication/Appointment Reminders)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- AUTOMATIC_RESCHEDULING (Automatic Rescheduling on Doctor Unavailability)
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- DARK_MODE (Dark Mode UI Theme)
+LINEMARKER
+- FAST_SCHEDULING (Fast Appointment Scheduling)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- DYNAMIC_BUTTON (Dynamic Button Display)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- AUTOMATIC_RESCHEDULING (Automatic Rescheduling on Doctor Unavailability)
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- DARK_MODE (Dark Mode UI Theme)
+LINEMARKER
+- FAST_SCHEDULING (Fast Appointment Scheduling)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- DYNAMIC_BUTTON (Dynamic Button Display)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- DYNAMIC_BUTTON (Dynamic Button Display)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- REMINDERS (Medication/Appointment Reminders)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- REMINDERS (Medication/Appointment Reminders)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- AUTOMATIC_RESCHEDULING (Automatic Rescheduling on Doctor Unavailability)
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- DARK_MODE (Dark Mode UI Theme)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- AUTOMATIC_RESCHEDULING (Automatic Rescheduling on Doctor Unavailability)
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- FAST_SCHEDULING (Fast Appointment Scheduling)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- DYNAMIC_BUTTON (Dynamic Button Display)
+LINEMARKER
+- REMINDERS (Medication/Appointment Reminders)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE
+System Status: OPERATIONAL
+LINEMARKER
+Active Features:
+LINEMARKER
+- AUTOMATIC_RESCHEDULING (Automatic Rescheduling on Doctor Unavailability)
+LINEMARKER
+- PREMIUM_SERVICE_ACCESS (Access to Better/Premium Services)
+LINEMARKER
+- INSURANCE_LEVELS (Varying Insurance Levels)
+LINEMARKER
+- FAST_SCHEDULING (Fast Appointment Scheduling)
+LINEMARKER
+- APPOINTMENTS (Appointment Management)
+LINEMARKER
+- MEDICAL_HISTORY (Personal Medical History)
+LINEMARKER
+- DYNAMIC_BUTTON (Dynamic Button Display)
+LINEMARKER
+- REMINDERS (Medication/Appointment Reminders)
+LINEMARKER
+Future Appointments:
+LINEMARKER
+Past Appointments:
+LINEMARKER
+ENDSTATE

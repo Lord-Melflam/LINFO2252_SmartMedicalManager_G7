@@ -10,9 +10,7 @@ public enum Feature {
     INSURANCE_LEVELS("Varying Insurance Levels"),
     PAYMENTS("Payment Management"),
 
-
     // Optional/Adaptive Features (from Lab 1 case study)
-    PAYMENT("Payment Feature"),
     REMINDERS("Medication/Appointment Reminders"),
     FAST_SCHEDULING("Fast Appointment Scheduling"),
     AUTOMATIC_RESCHEDULING("Automatic Rescheduling on Doctor Unavailability"),

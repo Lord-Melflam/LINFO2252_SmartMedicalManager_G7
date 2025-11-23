@@ -48,6 +48,7 @@ public class SmartMedicalModel implements TimeEventListener {
 
         // 1. Process Deactivations
         for (String name : toDeactivate) {
+            if (name.isEmpty()) continue;
             try {
                 Feature feature = Feature.valueOf(name);
                 if (feature.isMandatory()) {
@@ -63,6 +64,7 @@ public class SmartMedicalModel implements TimeEventListener {
 
         // 2. Process Activations
         for (String name : toActivate) {
+            if (name.isEmpty()) continue;
             try {
                 Feature feature = Feature.valueOf(name);
                 newActiveFeatures.add(feature);
