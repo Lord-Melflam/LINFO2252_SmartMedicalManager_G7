@@ -10,6 +10,7 @@ public class SmartMedicalModel implements TimeEventListener {
     private final Set<Feature> activeFeatures = new HashSet<>();
     private final ArrayList<Appointment> futureAppointments = new ArrayList<>();
     private final ArrayList<Appointment> pastAppointments = new ArrayList<>();
+    private final ArrayList<Notification> notifications = new ArrayList<>();
 
     private final Logger logger = Logger.getInstance();
     private final TimeEventSystem tes = TimeEventSystem.getInstance();
@@ -34,6 +35,84 @@ public class SmartMedicalModel implements TimeEventListener {
         futureAppointments.sort(Comparator.comparingInt(app -> app.getDay()));
 
         logger.log("Model", "Added appointment: " + a);
+        // create a user-visible notification
+        addNotification("Appointment added for " + patient + " on day " + day);
+    }
+
+    /**
+     * Return a copy of the current future appointments. Caller may inspect but
+     * must not modify the returned list to avoid concurrent modification.
+     */
+    public synchronized java.util.List<Appointment> getFutureAppointments() {
+        return new ArrayList<>(futureAppointments);
+    }
+
+    /**
+     * Cancel a future appointment by index (as returned by {@link #getFutureAppointments()}).
+     * Returns true if cancellation succeeded.
+     */
+    public synchronized boolean cancelAppointment(int index) {
+        if (index < 0 || index >= futureAppointments.size()) {
+            logger.error("Model", "cancelAppointment: invalid index " + index);
+            return false;
+        }
+        Appointment a = futureAppointments.get(index);
+        if (a.isCancelled()) {
+            logger.log("Model", "cancelAppointment: appointment already cancelled: " + a);
+            return false;
+        }
+        a.setCancelled(true);
+        logger.log("Model", "Cancelled appointment: " + a);
+        addNotification("Appointment cancelled for " + a.getPatient() + " scheduled day " + a.getDay());
+        return true;
+    }
+
+    /**
+     * Add a notification to the system.
+     */
+    public synchronized void addNotification(String message) {
+        Notification n = new Notification(message);
+        notifications.add(0, n); // newest first
+        logger.log("Model", "Notification added: " + n);
+    }
+
+    /**
+     * Return a copy of notifications (newest first).
+     */
+    public synchronized java.util.List<Notification> getNotifications() {
+        return new ArrayList<>(notifications);
+    }
+
+    /**
+     * Return only unread notifications.
+     */
+    public synchronized java.util.List<Notification> getUnreadNotifications() {
+        java.util.List<Notification> out = new ArrayList<>();
+        for (Notification n : notifications) if (!n.isRead()) out.add(n);
+        return out;
+    }
+
+    /**
+     * Mark a notification read by id. Returns true if found.
+     */
+    public synchronized boolean markNotificationRead(String id) {
+        for (Notification n : notifications) {
+            if (n.getId().equals(id)) {
+                if (!n.isRead()) n.markRead();
+                logger.log("Model", "Notification marked read: " + id);
+                return true;
+            }
+        }
+        logger.error("Model", "markNotificationRead: not found " + id);
+        return false;
+    }
+
+    /**
+     * Clear (remove) all notifications.
+     */
+    public synchronized void clearNotifications() {
+        notifications.clear();
+        logger.log("Model", "All notifications cleared.");
     }
 
     /**
@@ -166,12 +245,14 @@ public class SmartMedicalModel implements TimeEventListener {
 
         earliest.setCancelled(true);
         logger.log("Model", "Doctor unavailable: cancelled appointment " + earliest);
+        addNotification("Doctor unavailable: cancelled appointment for " + earliest.getPatient() + " on day " + earliest.getDay());
 
         if (activeFeatures.contains(Feature.AUTOMATIC_RESCHEDULING)) {
             int newDay = earliest.getDay() + 1;
             Appointment res = new Appointment(newDay, earliest.getPatient());
             futureAppointments.add(res);
             logger.log("Model", "AUTOMATIC_RESCHEDULING: rescheduled to day " + newDay);
+            addNotification("Appointment rescheduled to day " + newDay + " for " + earliest.getPatient());
         }
     }
 
@@ -183,6 +264,7 @@ public class SmartMedicalModel implements TimeEventListener {
 
         Appointment target = futureAppointments.get(0);
         target.setResult("Patient reported illness");
+        addNotification("Patient reported illness for appointment on day " + target.getDay() + " (" + target.getPatient() + ")");
 
         if (activeFeatures.contains(Feature.AUTOMATIC_RESCHEDULING)) {
             target.setCancelled(true);
@@ -191,6 +273,7 @@ public class SmartMedicalModel implements TimeEventListener {
             Appointment followUp = new Appointment(newDay, target.getPatient());
             futureAppointments.add(followUp);
             logger.log("Model", "USER_ILL: created follow-up appointment on day " + newDay);
+            addNotification("USER_ILL: created follow-up appointment on day " + newDay + " for " + target.getPatient());
         } else {
             logger.log("Model", "USER_ILL: annotated appointment: " + target);
         }

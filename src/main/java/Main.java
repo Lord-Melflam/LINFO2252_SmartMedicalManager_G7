@@ -8,9 +8,9 @@ public class Main {
     private static Logger logger = Logger.getInstance();
     private static SmartMedicalController controller = SmartMedicalController.getInstance();
 
-    public static void printInfo() {
+    private static void printInfo() {
         logger.log("System", "System Ready. Enter commands:");
-        controller.printHelp(logger);
+        SmartMedicalController.printHelp(logger);
     }
 
     private static void commandLoop() {

@@ -4,9 +4,12 @@ package Controller;
 import Logger.Logger;
 import Model.Feature;
 import Model.SmartMedicalModel;
+import Model.Appointment;
+import Model.Notification;
 import Model.TimeEvent;
 import Model.TimeEventSystem;
 import View.SmartMedicalView;
+import java.util.List;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -101,6 +104,20 @@ public class SmartMedicalController implements ControllerInterface {
         commands.put("help", args -> {
             printHelp(logger);
         });
+
+        // Notifications CLI commands
+        commands.put("notifications", args -> {
+            java.util.List<Notification> list = getNotifications();
+            if (list.isEmpty()) {
+                logger.log("Controller", "No notifications.");
+            } else {
+                for (Notification n : list) logger.log("Controller", n.toString());
+            }
+        });
+
+        commands.put("clearnotifs", args -> {
+            clearNotifications();
+        });
     }
 
     public static void printHelp(Logger logger) {
@@ -169,6 +186,64 @@ public class SmartMedicalController implements ControllerInterface {
     @Override
     public String[] getStateAsLog() {
         return model.getCurrentStateLog();
+    }
+
+    public boolean addAppointmentDirect(String patient, int day) {
+        try {
+            model.addAppointment(patient, day);
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Directly added appointment for " + patient + " on day " + day);
+            return true;
+        } catch (Exception e) {
+            logger.error("Controller", "addAppointmentDirect failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Return a copy of future appointments for UI display.
+     */
+    public List<Appointment> getFutureAppointments() {
+        return model.getFutureAppointments();
+    }
+
+    /**
+     * Notifications API
+     */
+    public java.util.List<Notification> getNotifications() {
+        return model.getNotifications();
+    }
+
+    public java.util.List<Notification> getUnreadNotifications() {
+        return model.getUnreadNotifications();
+    }
+
+    public boolean markNotificationRead(String id) {
+        boolean res = model.markNotificationRead(id);
+        if (res) {
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Marked notification read: " + id);
+        }
+        return res;
+    }
+
+    public void clearNotifications() {
+        model.clearNotifications();
+        if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+    }
+
+    /**
+     * Cancel appointment by index (as returned by {@link #getFutureAppointments()}).
+     */
+    public boolean cancelAppointment(int index) {
+        boolean res = model.cancelAppointment(index);
+        if (res) {
+            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
+            logger.log("Controller", "Cancelled appointment index: " + index);
+        } else {
+            logger.error("Controller", "Failed to cancel appointment index: " + index);
+        }
+        return res;
     }
 
     /**
