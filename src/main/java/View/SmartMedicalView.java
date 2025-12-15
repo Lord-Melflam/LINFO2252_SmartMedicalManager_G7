@@ -26,16 +26,7 @@ public class SmartMedicalView {
         return instance;
     }
 
-    private void logAvailableThemes() {
-        StringBuilder builder = new StringBuilder("Registered Themes:\n");
-        for (Theme theme : LafManager.getRegisteredThemes()) {
-            builder.append(" - ").append(theme.getName()).append("\n");
-        }
-        logger.log("View", builder.toString());
-    }
-
     private void createForm() {
-        logAvailableThemes();
         // Install default theme (dark mode)
         setDarkMode(true);
 

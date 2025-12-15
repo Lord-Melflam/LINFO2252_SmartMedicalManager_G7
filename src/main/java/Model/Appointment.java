@@ -5,42 +5,35 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public class Appointment {
-    private final int day; // legacy field (kept for compatibility)
-    private final LocalDate date; // preferred source-of-truth for scheduling
+    private LocalDate date; // preferred source-of-truth for scheduling
     private final UUID id; // immutable unique identifier
     private final String patient;
+    private String staff;
     private boolean cancelled = false;
     private boolean isHistory = false;
     private String result = "";
 
-    public Appointment(int day, String patient) {
-        this.day = day;
-        this.patient = patient;
+    public Appointment(LocalDate date, String patient, String staff) {
+        this.date = date;
         this.id = UUID.randomUUID();
-        // Map the integer day into a LocalDate relative to the TES currentDay.
-        // We assume that `LocalDate.now()` corresponds to the current TES day at runtime.
-        int currentDay = TimeEventSystem.getInstance().getCurrentDay();
-        this.date = LocalDate.now().plusDays(day - currentDay);
+        this.patient = patient;
+        this.staff = staff;
     }
 
-    // New constructor to create Appointment directly from a LocalDate
-    public Appointment(LocalDate date, String patient) {
-        this.date = date;
-        this.patient = patient;
-        this.id = UUID.randomUUID();
-        // compute legacy day relative to TES currentDay
-        int currentDay = TimeEventSystem.getInstance().getCurrentDay();
-        this.day = currentDay + (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date);
+    public Appointment(Appointment a) {
+        this.date = a.date;
+        this.id = a.id;
+        this.patient = a.patient;
+        this.staff = a.staff;
+        this.cancelled = a.cancelled;
+        this.isHistory = a.isHistory;
+        this.result = a.result;
     }
 
     @Override
     public String toString() {
-        return "Appointment{id=" + id + ", date=" + date + ", day=" + day + ", patient=" + patient
+        return "Appointment{id=" + id + ", date=" + date + ", patient=" + patient + ", staff=" + staff
                 + (cancelled ? ", CANCELLED" : "") + (isHistory ? ", HISTORY" : "") + "}";
-    }
-
-    public int getDay() {
-        return day;
     }
 
     /**
@@ -48,6 +41,10 @@ public class Appointment {
      */
     public LocalDate getDate() {
         return date;
+    }
+
+    public void setDate(LocalDate newDate) {
+        date = newDate;
     }
 
     /**
@@ -60,6 +57,10 @@ public class Appointment {
     public String getPatient() {
         return patient;
     }
+
+    public String getStaff() { return staff; }
+
+    public void setStaff(String staff) { this.staff = staff; }
 
     public boolean isCancelled() {
         return cancelled;

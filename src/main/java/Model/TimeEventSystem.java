@@ -3,6 +3,7 @@ package Model;
 
 import Logger.Logger;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -11,7 +12,7 @@ public class TimeEventSystem {
     private static TimeEventSystem instance;
     private final List<TimeEventListener> listeners = new ArrayList<>();
     private final Random rng = new Random();
-    private int currentDay = 0;
+    private LocalDate date = LocalDate.now();
 
     private Logger logger = Logger.getInstance();
 
@@ -35,8 +36,8 @@ public class TimeEventSystem {
         listeners.remove(l);
     }
 
-    public int getCurrentDay() {
-        return currentDay;
+    public synchronized LocalDate getCurrentDate() {
+        return date;
     }
 
     /**
@@ -50,7 +51,7 @@ public class TimeEventSystem {
         if (days <= 0) return;
         for (int i = 0; i < days; i++) {
             synchronized (this) {
-                currentDay++;
+                date = date.plusDays(1);
             }
             notifyListeners(TimeEvent.DAY_PASSED, 1);
 

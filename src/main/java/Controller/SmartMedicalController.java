@@ -92,8 +92,8 @@ public class SmartMedicalController implements ControllerInterface {
                     String patient = parts[0];
                     try {
                         int offset = Integer.parseInt(parts[1]);
-                        int day = tes.getCurrentDay() + offset;
-                        model.addAppointment(patient, day);
+                        LocalDate date = tes.getCurrentDate().plusDays(offset);
+                        model.addAppointment(patient, "Unassigned", date);
                     } catch (NumberFormatException nfe) {
                         logger.error("Controller", "Invalid offset: " + parts[1]);
                     }
@@ -191,9 +191,9 @@ public class SmartMedicalController implements ControllerInterface {
         return model.getCurrentStateLog();
     }
 
-    public boolean addAppointmentDirect(String patient, int day) {
+    public boolean addAppointmentDirect(String patient, String staff, LocalDate day) {
         try {
-            model.addAppointment(patient, day);
+            model.addAppointment(patient, staff, day);
             if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
             logger.log("Controller", "Directly added appointment for " + patient + " on day " + day);
             return true;
@@ -206,12 +206,12 @@ public class SmartMedicalController implements ControllerInterface {
     /**
      * New API: add an appointment by LocalDate, returning the UUID of the created appointment.
      */
-    public UUID addAppointment(LocalDate date, String patient) {
+    public Appointment addAppointment(LocalDate date, String patient, String staff) {
         try {
-            UUID id = model.addAppointment(date, patient);
+            Appointment appointment = model.addAppointment(patient, staff, date);
             if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
-            logger.log("Controller", "Added appointment (by date) for " + patient + " on " + date + " id=" + id);
-            return id;
+            logger.log("Controller", "Added appointment: " + appointment.toString());
+            return appointment;
         } catch (Exception e) {
             logger.error("Controller", "addAppointment failed: " + e.getMessage());
             return null;
@@ -264,37 +264,6 @@ public class SmartMedicalController implements ControllerInterface {
     public void clearNotifications() {
         model.clearNotifications();
         if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
-    }
-
-    /* Themes API */
-    public List<Theme> getAvailableThemes() {
-        java.util.List<Theme> list = model.getAvailableThemes();
-        logger.log("Controller", "getAvailableThemes: returning " + list.size() + " themes");
-        return list;
-    }
-
-    public boolean addTheme(Theme theme) {
-        logger.log("Controller", "addTheme requested: " + theme);
-        boolean res = model.addTheme(theme);
-        if (res) {
-            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
-            logger.log("Controller", "Theme added: " + theme);
-        }
-        return res;
-    }
-
-    public Theme getActiveTheme() {
-        return model.getActiveTheme();
-    }
-
-    public boolean setActiveTheme(Theme theme) {
-        logger.log("Controller", "setActiveTheme requested: " + theme);
-        boolean res = model.setActiveTheme(theme);
-        if (res) {
-            if (isUIViewEnabled) view.updateDisplay(model.getCurrentStateLog());
-            logger.log("Controller", "Active theme set to: " + theme);
-        }
-        return res;
     }
 
     /**
