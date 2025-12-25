@@ -4,19 +4,28 @@
  */
 package com.mycompany.ui;
 
+import com.mycompany.ui.model.Appointment;
+import com.mycompany.ui.model.AppointmentTableModel;
+
 /**
+ * Main application frame for the Smart Medical Manager.
+ * Follows MVC pattern with separated concerns.
  *
  * @author Ji
  */
 public class MainFrame extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MainFrame.class.getName());
+    
+    private AppointmentTableModel appointmentModel;
 
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
         initComponents();
+        initializeAppointmentData();
+        setupSearchFunctionality();
     }
 
     /**
@@ -183,23 +192,8 @@ public class MainFrame extends javax.swing.JFrame {
 
         appointmentsTab.setLayout(new java.awt.CardLayout());
 
-        appointmentsTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {"22-12-2025", "Dr. Angst", "Hospital Dav", "Stomach pain", "Confirmed"},
-                {"06-01-25", "Dr. Stuckov", "Hospital Helen", "Vaccine", "Cancelled"}
-            },
-            new String [] {
-                "Date", "Doctor", "Location", "Reason", "Status"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-        });
+        // Table model will be set in initializeAppointmentData()
+        appointmentsTable.setModel(new javax.swing.table.DefaultTableModel());
         appointmentsTable.setColumnSelectionAllowed(true);
         appointmentsTableScroll.setViewportView(appointmentsTable);
         appointmentsTable.getColumnModel().getSelectionModel().setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
@@ -671,8 +665,83 @@ public class MainFrame extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void searchBarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_searchBarActionPerformed
-        // TODO add your handling code here:
+        performSearch();
     }//GEN-LAST:event_searchBarActionPerformed
+    
+    /**
+     * Initializes appointment data using the model layer.
+     * Separates data initialization from UI logic.
+     */
+    private void initializeAppointmentData() {
+        appointmentModel = new AppointmentTableModel();
+        
+        // Add sample appointments
+        appointmentModel.addAppointment(new Appointment(
+            "22-12-2025", "Dr. Angst", "Hospital Dav", "Stomach pain", "Confirmed"
+        ));
+        appointmentModel.addAppointment(new Appointment(
+            "06-01-25", "Dr. Stuckov", "Hospital Helen", "Vaccine", "Cancelled"
+        ));
+        
+        // Set the model to the table
+        appointmentsTable.setModel(appointmentModel);
+    }
+    
+    /**
+     * Setup search functionality with real-time filtering.
+     * Delegates filtering logic to the model layer.
+     */
+    private void setupSearchFunctionality() {
+        // Add document listener for real-time search as user types
+        searchBar.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                performSearch();
+            }
+            
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                performSearch();
+            }
+            
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                performSearch();
+            }
+        });
+        
+        // Clear placeholder text on focus
+        searchBar.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent evt) {
+                if ("Search...".equals(searchBar.getText())) {
+                    searchBar.setText("");
+                }
+            }
+            
+            @Override
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                if (searchBar.getText().isEmpty()) {
+                    searchBar.setText("Search...");
+                }
+            }
+        });
+    }
+    
+    /**
+     * Performs search by delegating to the model.
+     * UI layer only handles getting the search text.
+     */
+    private void performSearch() {
+        String searchText = searchBar.getText().trim();
+        
+        // Don't filter on the placeholder text
+        if ("Search...".equals(searchText)) {
+            appointmentModel.clearFilter();
+        } else {
+            appointmentModel.applyFilter(searchText);
+        }
+    }
 
     private void consultationTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_consultationTypeActionPerformed
         // TODO add your handling code here:
