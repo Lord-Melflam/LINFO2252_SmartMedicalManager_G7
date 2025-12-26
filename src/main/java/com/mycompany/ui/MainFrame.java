@@ -30,7 +30,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private DataProvider dataProvider;
     private TimePickerPanel timePicker;
     private boolean showUpcomingOnHome = true; // Toggle for home page appointments
-    private javax.swing.JButton toggleAppointmentsBtn; // Toggle button for past/upcoming
     private Appointment appointmentBeingModified = null; // Track which appointment is being edited
 
     /**
@@ -65,22 +64,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         initializeTimePicker();
         updateProfileDisplay();
         initializeFeatureCheckboxes();
-        initializeToggleButton();
         updateHomePageAppointments();
-    }
-    
-    /**
-     * Initialize toggle button for switching between past/upcoming appointments.
-     */
-    private void initializeToggleButton() {
-        toggleAppointmentsBtn = new javax.swing.JButton("Show Past Appointments");
-        toggleAppointmentsBtn.addActionListener(e -> toggleHomePageAppointments());
-        
-        // Add button to home tab layout - we need to find a good place for it
-        // For now, let's add it programmatically near jLabel6
-        // This will be added to the GroupLayout in the homeTab
-        homeTab.add(toggleAppointmentsBtn);
-        homeTab.revalidate();
     }
 
     /**
@@ -107,16 +91,20 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         notificationsRemindersList = new javax.swing.JScrollPane();
         jList1 = new javax.swing.JList<>();
         jLabel6 = new javax.swing.JLabel();
+        toggleAppointmentsBtn = new javax.swing.JButton();
         appointmentsTab = new javax.swing.JPanel();
         appointmentsView = new javax.swing.JPanel();
         appointmentsTableScroll = new javax.swing.JScrollPane();
         appointmentsTable = new javax.swing.JTable();
         newBtn = new javax.swing.JButton();
+        filterLabel = new javax.swing.JLabel();
+        appointmentOpsLabel = new javax.swing.JLabel();
         searchBar = new javax.swing.JTextField();
         modifyBtn = new javax.swing.JButton();
         cancelAppBtn = new javax.swing.JButton();
         applyFilterBtn = new javax.swing.JButton();
         timePeriodList = new javax.swing.JList<>();
+        filterSeparator = new javax.swing.JSeparator();
         bookPanel = new javax.swing.JPanel();
         consultationType = new javax.swing.JComboBox<>();
         jLabel7 = new javax.swing.JLabel();
@@ -205,6 +193,9 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         jLabel6.setText("Upcoming appointment(s)");
         jLabel6.setFont(new java.awt.Font("Dialog", java.awt.Font.BOLD, 14));
 
+        toggleAppointmentsBtn.setText("Show Past Appointments");
+        toggleAppointmentsBtn.addActionListener(e -> toggleHomePageAppointments());
+
         javax.swing.GroupLayout homeTabLayout = new javax.swing.GroupLayout(homeTab);
         homeTab.setLayout(homeTabLayout);
         homeTabLayout.setHorizontalGroup(
@@ -212,31 +203,29 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             .addGroup(homeTabLayout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(notificationsRemindersList)
+                    .addComponent(upcomingAppointments)
                     .addComponent(jLabel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 783, Short.MAX_VALUE)
-                    .addComponent(upcomingAppointments))
+                    .addComponent(notificationsRemindersList)
+                    .addGroup(homeTabLayout.createSequentialGroup()
+                        .addComponent(jLabel6)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(toggleAppointmentsBtn)))
                 .addContainerGap())
-            .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                .addGroup(homeTabLayout.createSequentialGroup()
-                    .addContainerGap()
-                    .addComponent(jLabel6, javax.swing.GroupLayout.DEFAULT_SIZE, 783, Short.MAX_VALUE)
-                    .addContainerGap()))
         );
         homeTabLayout.setVerticalGroup(
             homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(homeTabLayout.createSequentialGroup()
-                .addContainerGap(34, Short.MAX_VALUE)
+                .addContainerGap()
+                .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(toggleAppointmentsBtn))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(upcomingAppointments, javax.swing.GroupLayout.PREFERRED_SIZE, 451, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(notificationsRemindersList, javax.swing.GroupLayout.PREFERRED_SIZE, 216, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap())
-            .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                .addGroup(homeTabLayout.createSequentialGroup()
-                    .addGap(10, 10, 10)
-                    .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addContainerGap(709, Short.MAX_VALUE)))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         mainTabs.addTab("Home", homeTab);
@@ -259,6 +248,10 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         newBtn.setText("New Appointment");
         newBtn.addActionListener(this::newBtnActionPerformed);
 
+    filterLabel.setText("Search & Filters");
+
+        appointmentOpsLabel.setText("Appointment Operations");
+
         searchBar.setText("Search...");
         searchBar.setToolTipText("");
         searchBar.addActionListener(this::searchBarActionPerformed);
@@ -278,6 +271,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             public String getElementAt(int i) { return strings[i]; }
         });
 
+        filterSeparator.setOrientation(javax.swing.SwingConstants.HORIZONTAL);
+
         javax.swing.GroupLayout appointmentsViewLayout = new javax.swing.GroupLayout(appointmentsView);
         appointmentsView.setLayout(appointmentsViewLayout);
         appointmentsViewLayout.setHorizontalGroup(
@@ -288,8 +283,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                     .addComponent(modifyBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(newBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(applyFilterBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(filterSeparator)
                     .addComponent(searchBar)
                     .addComponent(cancelAppBtn, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(filterLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(appointmentOpsLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(appointmentsViewLayout.createSequentialGroup()
                         .addGap(0, 2, Short.MAX_VALUE)
                         .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)))
@@ -304,12 +302,18 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 .addGroup(appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(appointmentsTableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 726, Short.MAX_VALUE)
                     .addGroup(appointmentsViewLayout.createSequentialGroup()
+                        .addComponent(filterLabel)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 78, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(14, 14, 14)
                         .addComponent(applyFilterBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(35, 35, 35)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(filterSeparator, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
+                        .addComponent(appointmentOpsLabel)
+                        .addGap(18, 18, 18)
                         .addComponent(newBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
                         .addComponent(modifyBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -900,66 +904,81 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
      */
     private void updateHomePageAppointments() {
         try {
-            java.util.List<Appointment> appointments = showUpcomingOnHome ? 
-                appointmentManager.getUpcomingAppointments() : 
+            java.util.List<Appointment> appointments = showUpcomingOnHome ?
+                appointmentManager.getUpcomingAppointments() :
                 appointmentManager.getPastAppointments();
-            
+
             java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
-            
-            // Update label and toggle button
+
+            // Update header and toggle button
             jLabel6.setText(showUpcomingOnHome ? "Upcoming Appointments" : "Past Appointments");
             if (toggleAppointmentsBtn != null) {
                 toggleAppointmentsBtn.setText(showUpcomingOnHome ? "Show Past Appointments" : "Show Upcoming Appointments");
             }
-            
-            // Hide all components first
-            date1.setVisible(false);
-            jButton1.setVisible(false);
-            date2.setVisible(false);
-            jButton2.setVisible(false);
-            date3.setVisible(false);
-            jButton3.setVisible(false);
-            
+
+            // Clear dynamic list and rebuild to auto-scale
+            jPanel2.removeAll();
+
             if (appointments.isEmpty()) {
-                // Show message when no appointments
-                String emptyMessage = showUpcomingOnHome ? 
-                    "No upcoming appointments scheduled" : 
+                String emptyMessage = showUpcomingOnHome ?
+                    "No upcoming appointments scheduled" :
                     "No past appointments found";
-                date1.setText(emptyMessage);
-                date1.setVisible(true);
-                jList1.setListData(new String[]{emptyMessage});
+                javax.swing.JLabel emptyLabel = new javax.swing.JLabel(emptyMessage);
+                jPanel2.add(emptyLabel);
+                // Hide notifications for past view
+                jLabel2.setVisible(showUpcomingOnHome);
+                notificationsRemindersList.setVisible(showUpcomingOnHome);
+                if (showUpcomingOnHome) {
+                    jList1.setListData(new String[]{emptyMessage});
+                } else {
+                    jList1.setListData(new String[0]);
+                }
             } else {
-                // Display appointments dynamically (only as many as exist)
-                javax.swing.JLabel[] dateLabels = {date1, date2, date3};
-                javax.swing.JButton[] buttons = {jButton1, jButton2, jButton3};
-                
-                for (int i = 0; i < Math.min(3, appointments.size()); i++) {
-                    Appointment apt = appointments.get(i);
+                // Build rows: [Label][View Details]
+                for (Appointment apt : appointments) {
                     try {
                         java.time.LocalDate aptDate = java.time.LocalDate.parse(apt.getDate(), formatter);
                         java.time.DayOfWeek dayOfWeek = aptDate.getDayOfWeek();
-                        String dayName = dayOfWeek.toString().substring(0, 1).toUpperCase() + 
-                                      dayOfWeek.toString().substring(1).toLowerCase();
-                        
-                        String display = dayName + " " + apt.getDate() + 
-                                       " at " + apt.getTime() + " with " + apt.getDoctor();
-                        
-                        dateLabels[i].setText(display);
-                        dateLabels[i].setVisible(true);
-                        buttons[i].setVisible(true);
+                        String dayName = dayOfWeek.toString().substring(0, 1).toUpperCase() +
+                                dayOfWeek.toString().substring(1).toLowerCase();
+                        String display = dayName + " " + apt.getDate() +
+                                " at " + apt.getTime() + " with " + apt.getDoctor();
+
+                        javax.swing.JLabel lbl = new javax.swing.JLabel(display);
+                        javax.swing.JButton viewBtn = new javax.swing.JButton("View Details");
+                        viewBtn.addActionListener(ev -> {
+                            mainTabs.setSelectedIndex(1); // Go to Appointments tab
+                            logger.info("Navigated to Appointments tab from home page");
+                        });
+                        jPanel2.add(lbl);
+                        jPanel2.add(viewBtn);
                     } catch (Exception e) {
-                        logger.warning("Error parsing appointment date: " + apt.getDate());
+                        // Fallback label if date parsing fails
+                        javax.swing.JLabel lbl = new javax.swing.JLabel(apt.getDate() + " at " + apt.getTime() + " with " + apt.getDoctor());
+                        javax.swing.JButton viewBtn = new javax.swing.JButton("View Details");
+                        viewBtn.addActionListener(ev -> {
+                            mainTabs.setSelectedIndex(1);
+                            logger.info("Navigated to Appointments tab from home page");
+                        });
+                        jPanel2.add(lbl);
+                        jPanel2.add(viewBtn);
                     }
                 }
-                
-                // Update notifications list
-                java.util.List<String> notifications = new java.util.ArrayList<>();
-                for (Appointment apt : appointments) {
-                    notifications.add(apt.getDoctor() + " - " + apt.getDate() + " at " + apt.getTime());
+
+                // Notifications show only for upcoming
+                jLabel2.setVisible(showUpcomingOnHome);
+                notificationsRemindersList.setVisible(showUpcomingOnHome);
+                if (showUpcomingOnHome) {
+                    java.util.List<String> notifications = new java.util.ArrayList<>();
+                    for (Appointment apt : appointments) {
+                        notifications.add(apt.getDoctor() + " - " + apt.getDate() + " at " + apt.getTime());
+                    }
+                    jList1.setListData(notifications.toArray(new String[0]));
+                } else {
+                    jList1.setListData(new String[0]);
                 }
-                jList1.setListData(notifications.toArray(new String[0]));
             }
-            
+
             // Refresh the panel
             jPanel2.revalidate();
             jPanel2.repaint();
@@ -1224,6 +1243,21 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         int selectedRow = appointmentsTable.getSelectedRow();
         if (selectedRow >= 0) {
             Appointment selected = appointmentModel.getAppointmentAt(selectedRow);
+
+            // If appointment is cancelled, confirm rescheduling
+            if ("Cancelled".equalsIgnoreCase(selected.getStatus())) {
+                int choice = javax.swing.JOptionPane.showConfirmDialog(this,
+                    "This appointment is cancelled. Do you want to reschedule it?",
+                    "Reschedule cancelled appointment",
+                    javax.swing.JOptionPane.YES_NO_OPTION,
+                    javax.swing.JOptionPane.WARNING_MESSAGE);
+                if (choice != javax.swing.JOptionPane.YES_OPTION) {
+                    return;
+                }
+                selected.setStatus("Scheduled");
+                appointmentManager.updateAppointment(selected);
+            }
+
             appointmentBeingModified = selected; // Track which appointment is being modified
             
             // Pre-fill the booking form with current appointment details
@@ -1464,6 +1498,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel adminTab;
+    private javax.swing.JLabel appointmentOpsLabel;
     private javax.swing.JButton applyFilterBtn;
     private javax.swing.JPanel appointmentsTab;
     private javax.swing.JTable appointmentsTable;
@@ -1479,6 +1514,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private javax.swing.JLabel date2;
     private javax.swing.JLabel date3;
     private javax.swing.JPanel featurePanel;
+    private javax.swing.JLabel filterLabel;
+    private javax.swing.JSeparator filterSeparator;
     private javax.swing.JPanel homeTab;
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
@@ -1541,5 +1578,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private javax.swing.JPanel settingsTab;
     private javax.swing.JList<String> timePeriodList;
     private javax.swing.JScrollPane upcomingAppointments;
+    private javax.swing.JButton toggleAppointmentsBtn;
     // End of variables declaration//GEN-END:variables
 }
