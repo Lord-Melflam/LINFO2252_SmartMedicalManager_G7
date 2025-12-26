@@ -9,8 +9,8 @@ import java.util.List;
  * Separates data management logic from UI presentation.
  */
 public class AppointmentTableModel extends AbstractTableModel {
-    private static final String[] COLUMN_NAMES = {"Date", "Doctor", "Location", "Reason", "Status"};
-    private static final Class<?>[] COLUMN_TYPES = {String.class, String.class, String.class, String.class, String.class};
+    private static final String[] COLUMN_NAMES = {"Date", "Time", "Doctor", "Location", "Reason", "Status"};
+    private static final Class<?>[] COLUMN_TYPES = {String.class, String.class, String.class, String.class, String.class, String.class};
     
     private final List<Appointment> allAppointments;
     private final List<Appointment> filteredAppointments;
@@ -117,10 +117,11 @@ public class AppointmentTableModel extends AbstractTableModel {
         Appointment appointment = filteredAppointments.get(rowIndex);
         return switch (columnIndex) {
             case 0 -> appointment.getDate();
-            case 1 -> appointment.getDoctor();
-            case 2 -> appointment.getLocation();
-            case 3 -> appointment.getReason();
-            case 4 -> appointment.getStatus();
+            case 1 -> appointment.getTime();
+            case 2 -> appointment.getDoctor();
+            case 3 -> appointment.getLocation();
+            case 4 -> appointment.getReason();
+            case 5 -> appointment.getStatus();
             default -> null;
         };
     }
