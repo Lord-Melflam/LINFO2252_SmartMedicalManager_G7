@@ -6,26 +6,81 @@ package com.mycompany.ui;
 
 import com.mycompany.ui.model.Appointment;
 import com.mycompany.ui.model.AppointmentTableModel;
+import com.mycompany.model.*;
+import com.mycompany.ui.components.*;
+import java.util.Arrays;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Main application frame for the Smart Medical Manager.
  * Follows MVC pattern with separated concerns.
+ * Observes Model changes and updates View accordingly.
  *
  * @author Ji
  */
-public class MainFrame extends javax.swing.JFrame {
+public class MainFrame extends javax.swing.JFrame implements FeatureObserver, PatientObserver, AppointmentObserver {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MainFrame.class.getName());
     
     private AppointmentTableModel appointmentModel;
+    private AppointmentManager appointmentManager;
+    private FeatureManager featureManager;
+    private PatientManager patientManager;
+    private DataProvider dataProvider;
+    private TimePickerPanel timePicker;
+    private boolean showUpcomingOnHome = true; // Toggle for home page appointments
+    private javax.swing.JButton toggleAppointmentsBtn; // Toggle button for past/upcoming
+    private Appointment appointmentBeingModified = null; // Track which appointment is being edited
 
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
         initComponents();
+        
+        // Initialize Model managers
+        this.appointmentManager = AppointmentManager.getInstance();
+        this.featureManager = FeatureManager.getInstance();
+        this.patientManager = PatientManager.getInstance();
+        this.dataProvider = DataProvider.getInstance();
+        
+        // Register as observer for model changes
+        appointmentManager.registerObserver(this);
+        featureManager.registerObserver(this);
+        patientManager.registerObserver(this);
+        
+        // Initialize UI with data
+        initializeUI();
+    }
+    
+    /**
+     * Initialize UI with data from Model layer.
+     * Separates data loading from UI generation.
+     */
+    private void initializeUI() {
         initializeAppointmentData();
         setupSearchFunctionality();
+        populateDropdowns();
+        initializeTimePicker();
+        updateProfileDisplay();
+        initializeFeatureCheckboxes();
+        initializeToggleButton();
+        updateHomePageAppointments();
+    }
+    
+    /**
+     * Initialize toggle button for switching between past/upcoming appointments.
+     */
+    private void initializeToggleButton() {
+        toggleAppointmentsBtn = new javax.swing.JButton("Show Past Appointments");
+        toggleAppointmentsBtn.addActionListener(e -> toggleHomePageAppointments());
+        
+        // Add button to home tab layout - we need to find a good place for it
+        // For now, let's add it programmatically near jLabel6
+        // This will be added to the GroupLayout in the homeTab
+        homeTab.add(toggleAppointmentsBtn);
+        homeTab.revalidate();
     }
 
     /**
@@ -122,37 +177,33 @@ public class MainFrame extends javax.swing.JFrame {
 
         jPanel2.setLayout(new java.awt.GridLayout(0, 2));
 
-        date1.setText("Thursday 05-06-2026");
+        date1.setText("");
         jPanel2.add(date1);
 
-        jButton1.setText("jButton1");
+        jButton1.setText("View Details");
         jButton1.addActionListener(this::jButton1ActionPerformed);
         jPanel2.add(jButton1);
 
-        date2.setText("Thursday 05-06-2026");
+        date2.setText("");
         jPanel2.add(date2);
 
-        jButton2.setText("jButton1");
+        jButton2.setText("View Details");
         jButton2.addActionListener(this::jButton2ActionPerformed);
         jPanel2.add(jButton2);
 
-        date3.setText("Thursday 05-06-2026");
+        date3.setText("");
         jPanel2.add(date3);
 
-        jButton3.setText("jButton1");
+        jButton3.setText("View Details");
         jButton3.addActionListener(this::jButton3ActionPerformed);
         jPanel2.add(jButton3);
 
         upcomingAppointments.setViewportView(jPanel2);
 
-        jList1.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
-            public int getSize() { return strings.length; }
-            public String getElementAt(int i) { return strings[i]; }
-        });
         notificationsRemindersList.setViewportView(jList1);
 
         jLabel6.setText("Upcoming appointment(s)");
+        jLabel6.setFont(new java.awt.Font("Dialog", java.awt.Font.BOLD, 14));
 
         javax.swing.GroupLayout homeTabLayout = new javax.swing.GroupLayout(homeTab);
         homeTab.setLayout(homeTabLayout);
@@ -669,19 +720,16 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_searchBarActionPerformed
     
     /**
-     * Initializes appointment data using the model layer.
-     * Separates data initialization from UI logic.
+     * Initializes appointment data from the Model layer.
+     * Replaces hardcoded sample data with data from AppointmentManager.
      */
     private void initializeAppointmentData() {
         appointmentModel = new AppointmentTableModel();
         
-        // Add sample appointments
-        appointmentModel.addAppointment(new Appointment(
-            "22-12-2025", "Dr. Angst", "Hospital Dav", "Stomach pain", "Confirmed"
-        ));
-        appointmentModel.addAppointment(new Appointment(
-            "06-01-25", "Dr. Stuckov", "Hospital Helen", "Vaccine", "Cancelled"
-        ));
+        // Load all appointments from manager
+        for (Appointment appointment : appointmentManager.getAllAppointments()) {
+            appointmentModel.addAppointment(appointment);
+        }
         
         // Set the model to the table
         appointmentsTable.setModel(appointmentModel);
@@ -742,73 +790,593 @@ public class MainFrame extends javax.swing.JFrame {
             appointmentModel.applyFilter(searchText);
         }
     }
+    
+    /**
+     * Populates dropdown menus with data from DataProvider.
+     * Replaces hardcoded options throughout the UI.
+     */
+    private void populateDropdowns() {
+        consultationType.setModel(new javax.swing.DefaultComboBoxModel<>(
+            dataProvider.getOptionsArray("consultationTypes")
+        ));
+        location.setModel(new javax.swing.DefaultComboBoxModel<>(
+            dataProvider.getOptionsArray("locations")
+        ));
+        personnel.setModel(new javax.swing.DefaultComboBoxModel<>(
+            dataProvider.getOptionsArray("personnel")
+        ));
+        roomType.setModel(new javax.swing.DefaultComboBoxModel<>(
+            dataProvider.getOptionsArray("roomTypes")
+        ));
+    }
+    
+    /**
+     * Initialize time picker for appointment scheduling.
+     */
+    private void initializeTimePicker() {
+        timePicker = new TimePickerPanel();
+        
+        // Fix calendar display issue - ensure font is set properly
+        try {
+            date.setFont(new java.awt.Font("Dialog", java.awt.Font.PLAIN, 12));
+            // Force calendar to redraw with proper font
+            java.awt.Component[] components = date.getComponents();
+            for (java.awt.Component comp : components) {
+                if (comp instanceof javax.swing.JPanel) {
+                    comp.setFont(new java.awt.Font("Dialog", java.awt.Font.PLAIN, 12));
+                }
+            }
+        } catch (Exception e) {
+            logger.warning("Could not fix calendar font: " + e.getMessage());
+        }
+        
+        // Add time picker to booking panel below the calendar
+        // Use BorderLayout to position it properly
+        javax.swing.JPanel rightPanel = new javax.swing.JPanel();
+        rightPanel.setLayout(new java.awt.BorderLayout(5, 5));
+        rightPanel.add(date, java.awt.BorderLayout.NORTH);
+        
+        javax.swing.JPanel timePanel = new javax.swing.JPanel();
+        timePanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Select Time"));
+        timePanel.add(timePicker);
+        rightPanel.add(timePanel, java.awt.BorderLayout.CENTER);
+        
+        // Replace calendar in bookPanel with our new panel containing both calendar and time picker
+        // This requires modifying the layout, so we rebuild the right side
+        bookPanel.removeAll();
+        rebuildBookingPanel(rightPanel);
+    }
+    
+    /**
+     * Rebuilds booking panel with time picker integrated.
+     */
+    private void rebuildBookingPanel(javax.swing.JPanel rightPanel) {
+        bookPanel.setLayout(new java.awt.BorderLayout(10, 10));
+        
+        // Left side with form fields
+        javax.swing.JPanel leftPanel = new javax.swing.JPanel();
+        leftPanel.setLayout(new java.awt.GridLayout(5, 2, 5, 5));
+        leftPanel.add(jLabel7);
+        leftPanel.add(consultationType);
+        leftPanel.add(jLabel8);
+        leftPanel.add(location);
+        leftPanel.add(jLabel9);
+        leftPanel.add(personnel);
+        leftPanel.add(jLabel10);
+        leftPanel.add(roomType);
+        
+        // Button panel at bottom
+        javax.swing.JPanel buttonPanel = new javax.swing.JPanel();
+        buttonPanel.setLayout(new java.awt.GridLayout(1, 2, 10, 0));
+        buttonPanel.add(cancelBtn);
+        buttonPanel.add(bookBtn);
+        
+        // Add all to bookPanel
+        bookPanel.add(leftPanel, java.awt.BorderLayout.WEST);
+        bookPanel.add(rightPanel, java.awt.BorderLayout.CENTER);
+        bookPanel.add(buttonPanel, java.awt.BorderLayout.SOUTH);
+        
+        bookPanel.revalidate();
+        bookPanel.repaint();
+    }
+    
+    /**
+     * Updates profile display with current patient information.
+     * Gets data from PatientManager instead of hardcoded placeholders.
+     */
+    private void updateProfileDisplay() {
+        PatientManager.Patient patient = patientManager.getCurrentPatient();
+        jLabel12.setText("First Name : " + patient.getFirstName());
+        jLabel13.setText("Last Name : " + patient.getLastName());
+        jLabel14.setText("Sex : " + patient.getSex());
+        jLabel15.setText("Age : " + patient.getAge());
+        jLabel16.setText("Insurance : " + patient.getInsuranceLevel());
+        jTextArea1.setText("Current Medication: " + patient.getCurrentMedication() + "\n" +
+                          "Vaccines: " + patient.getVaccines());
+    }
+    
+    /**
+     * Updates home page with upcoming or past appointments dynamically.
+     */
+    private void updateHomePageAppointments() {
+        try {
+            java.util.List<Appointment> appointments = showUpcomingOnHome ? 
+                appointmentManager.getUpcomingAppointments() : 
+                appointmentManager.getPastAppointments();
+            
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
+            
+            // Update label and toggle button
+            jLabel6.setText(showUpcomingOnHome ? "Upcoming Appointments" : "Past Appointments");
+            if (toggleAppointmentsBtn != null) {
+                toggleAppointmentsBtn.setText(showUpcomingOnHome ? "Show Past Appointments" : "Show Upcoming Appointments");
+            }
+            
+            // Hide all components first
+            date1.setVisible(false);
+            jButton1.setVisible(false);
+            date2.setVisible(false);
+            jButton2.setVisible(false);
+            date3.setVisible(false);
+            jButton3.setVisible(false);
+            
+            if (appointments.isEmpty()) {
+                // Show message when no appointments
+                String emptyMessage = showUpcomingOnHome ? 
+                    "No upcoming appointments scheduled" : 
+                    "No past appointments found";
+                date1.setText(emptyMessage);
+                date1.setVisible(true);
+                jList1.setListData(new String[]{emptyMessage});
+            } else {
+                // Display appointments dynamically (only as many as exist)
+                javax.swing.JLabel[] dateLabels = {date1, date2, date3};
+                javax.swing.JButton[] buttons = {jButton1, jButton2, jButton3};
+                
+                for (int i = 0; i < Math.min(3, appointments.size()); i++) {
+                    Appointment apt = appointments.get(i);
+                    try {
+                        java.time.LocalDate aptDate = java.time.LocalDate.parse(apt.getDate(), formatter);
+                        java.time.DayOfWeek dayOfWeek = aptDate.getDayOfWeek();
+                        String dayName = dayOfWeek.toString().substring(0, 1).toUpperCase() + 
+                                      dayOfWeek.toString().substring(1).toLowerCase();
+                        
+                        String display = dayName + " " + apt.getDate() + 
+                                       " at " + apt.getTime() + " with " + apt.getDoctor();
+                        
+                        dateLabels[i].setText(display);
+                        dateLabels[i].setVisible(true);
+                        buttons[i].setVisible(true);
+                    } catch (Exception e) {
+                        logger.warning("Error parsing appointment date: " + apt.getDate());
+                    }
+                }
+                
+                // Update notifications list
+                java.util.List<String> notifications = new java.util.ArrayList<>();
+                for (Appointment apt : appointments) {
+                    notifications.add(apt.getDoctor() + " - " + apt.getDate() + " at " + apt.getTime());
+                }
+                jList1.setListData(notifications.toArray(new String[0]));
+            }
+            
+            // Refresh the panel
+            jPanel2.revalidate();
+            jPanel2.repaint();
+        } catch (Exception e) {
+            logger.severe("Error updating home page: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Toggles between showing upcoming and past appointments on home page.
+     */
+    private void toggleHomePageAppointments() {
+        showUpcomingOnHome = !showUpcomingOnHome;
+        updateHomePageAppointments();
+        logger.info("Toggled to show " + (showUpcomingOnHome ? "upcoming" : "past") + " appointments");
+    }
+    
+    /**
+     * Initializes feature checkboxes with real feature names and listeners.
+     * Only shows Reminders and PatientView. Hides Email, AdvancedSearch, and Fast.
+     */
+    private void initializeFeatureCheckboxes() {
+        java.util.List<javax.swing.JCheckBox> checkboxes = Arrays.asList(
+            jCheckBox1, jCheckBox3, jCheckBox4, jCheckBox5, jCheckBox6
+        );
+        
+        java.util.List<String> featureNames = Arrays.asList(
+            "Reminders", "AdvancedSearch", "Fast", "PatientView", "Email"
+        );
+        
+        // Features to show: indices 0 (Reminders) and 3 (PatientView)
+        java.util.List<Integer> featuresToShow = Arrays.asList(0, 3);
+        // Features to hide: indices 1 (AdvancedSearch), 2 (Fast), 4 (Email)
+        java.util.List<Integer> featuresToHide = Arrays.asList(1, 2, 4);
+        
+        // Hide and disable unwanted checkboxes
+        for (Integer idx : featuresToHide) {
+            checkboxes.get(idx).setVisible(false);
+            checkboxes.get(idx).setEnabled(false);
+        }
+        
+        // Setup visible features
+        for (Integer featureIdx : featuresToShow) {
+            javax.swing.JCheckBox checkbox = checkboxes.get(featureIdx);
+            String feature = featureNames.get(featureIdx);
+            
+            // Set proper label
+            checkbox.setText(feature);
+            checkbox.setVisible(true);
+            checkbox.setEnabled(true);
+            
+            // Set initial state
+            checkbox.setSelected(featureManager.isFeatureActive(feature));
+            
+            // Add listener for feature activation/deactivation
+            checkbox.addActionListener(e -> handleFeatureToggle(feature, checkbox.isSelected(), checkbox));
+        }
+    }
+    
+    /**
+     * Handles feature activation/deactivation when checkbox is toggled.
+     * Special handling for Reminders to show/hide notification preferences.
+     */
+    private void handleFeatureToggle(String feature, boolean activate, javax.swing.JCheckBox checkbox) {
+        try {
+            if (activate) {
+                featureManager.activateFeatures(feature);
+                logger.info("Feature activated: " + feature);
+                
+                // Special handling for Reminders
+                if ("Reminders".equals(feature)) {
+                    showReminderOptions();
+                }
+            } else {
+                featureManager.deactivateFeatures(feature);
+                logger.info("Feature deactivated: " + feature);
+                
+                // Special handling for Reminders
+                if ("Reminders".equals(feature)) {
+                    hideReminderNotifications();
+                }
+            }
+        } catch (IllegalStateException e) {
+            // Cannot deactivate mandatory feature
+            logger.warning("Cannot deactivate mandatory feature: " + feature);
+            checkbox.setSelected(true); // Revert checkbox
+            javax.swing.JOptionPane.showMessageDialog(this, 
+                "Cannot deactivate mandatory feature: " + feature);
+        }
+    }
+    
+    /**
+     * Shows reminder options when Reminders feature is enabled.
+     */
+    private void showReminderOptions() {
+        String[] options = {"In App", "Email", "Cancel"};
+        int choice = javax.swing.JOptionPane.showOptionDialog(this,
+            "How would you like to receive appointment reminders?",
+            "Reminder Preferences",
+            javax.swing.JOptionPane.YES_NO_CANCEL_OPTION,
+            javax.swing.JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[0]);
+        
+        if (choice == 0) {
+            // In App reminders
+            featureManager.setFeatureAttribute("Reminders", "type", "InApp");
+            logger.info("Reminders set to: In App");
+        } else if (choice == 1) {
+            // Email reminders - ask for email
+            String email = javax.swing.JOptionPane.showInputDialog(this,
+                "Enter your email address for appointment reminders:",
+                "Email Reminders",
+                javax.swing.JOptionPane.QUESTION_MESSAGE);
+            
+            if (email != null && !email.trim().isEmpty()) {
+                if (isValidEmail(email)) {
+                    featureManager.setFeatureAttribute("Reminders", "type", "Email");
+                    featureManager.setFeatureAttribute("Reminders", "email", email);
+                    logger.info("Reminders set to: Email (" + email + ")");
+                } else {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Invalid email format. Please enter a valid email.",
+                        "Invalid Email",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Hides reminder notifications when Reminders feature is disabled.
+     */
+    private void hideReminderNotifications() {
+        // Hide reminders from home page notifications list
+        updateHomePageAppointments();
+    }
+    
+    /**
+     * Simple email validation.
+     */
+    private boolean isValidEmail(String email) {
+        return email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
+    }
 
     private void consultationTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_consultationTypeActionPerformed
-        // TODO add your handling code here:
+        String selected = (String) consultationType.getSelectedItem();
+        logger.info("Consultation type selected: " + selected);
     }//GEN-LAST:event_consultationTypeActionPerformed
 
     private void locationActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_locationActionPerformed
-        // TODO add your handling code here:
+        String selected = (String) location.getSelectedItem();
+        logger.info("Location selected: " + selected);
     }//GEN-LAST:event_locationActionPerformed
 
     private void personnelActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_personnelActionPerformed
-        // TODO add your handling code here:
+        String selected = (String) personnel.getSelectedItem();
+        logger.info("Personnel selected: " + selected);
     }//GEN-LAST:event_personnelActionPerformed
 
     private void roomTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_roomTypeActionPerformed
-        // TODO add your handling code here:
+        String selected = (String) roomType.getSelectedItem();
+        logger.info("Room type selected: " + selected);
     }//GEN-LAST:event_roomTypeActionPerformed
 
     private void bookBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_bookBtnActionPerformed
-        // TODO add your handling code here:
+        try {
+            String consultType = (String) consultationType.getSelectedItem();
+            String loc = (String) location.getSelectedItem();
+            String doctor = (String) personnel.getSelectedItem();
+            String roomTypeSelected = (String) roomType.getSelectedItem();
+            
+            // Get date from calendar in dd-MM-yyyy format
+            java.util.Date selectedDate = date.getDate();
+            if (selectedDate == null) {
+                javax.swing.JOptionPane.showMessageDialog(this, "Please select a date.");
+                return;
+            }
+            String dateStr = new java.text.SimpleDateFormat("dd-MM-yyyy").format(selectedDate);
+            
+            // Get time from time picker if available, otherwise default to 09:00
+            String timeStr = "09:00";
+            if (timePicker != null) {
+                timeStr = timePicker.getSelectedTime();
+            }
+            
+            if (appointmentBeingModified != null) {
+                // UPDATE MODE: Modify existing appointment
+                appointmentBeingModified.setDate(dateStr);
+                appointmentBeingModified.setTime(timeStr);
+                appointmentBeingModified.setLocation(loc);
+                appointmentBeingModified.setDoctor(doctor);
+                appointmentBeingModified.setReason(consultType);
+                appointmentBeingModified.setAttribute("roomType", roomTypeSelected);
+                
+                appointmentManager.updateAppointment(appointmentBeingModified);
+                
+                javax.swing.JOptionPane.showMessageDialog(this, 
+                    "Appointment updated successfully!\n" + dateStr + " at " + timeStr + " with " + doctor);
+                
+                logger.info("Appointment updated: " + dateStr + " at " + timeStr + " with " + doctor);
+                
+                // Reset the modify flag
+                appointmentBeingModified = null;
+                bookBtn.setText("Book");
+            } else {
+                // CREATE MODE: New appointment
+                Appointment newAppointment = new Appointment(
+                    dateStr, timeStr, doctor, loc, consultType, "Scheduled",
+                    java.util.Map.of(
+                        "consultationType", consultType,
+                        "roomType", roomTypeSelected
+                    )
+                );
+                
+                appointmentManager.addAppointment(newAppointment);
+                javax.swing.JOptionPane.showMessageDialog(this, 
+                    "Appointment booked successfully!\n" + dateStr + " at " + timeStr + " with " + doctor);
+                
+                logger.info("Appointment booked: " + dateStr + " at " + timeStr + " with " + doctor);
+            }
+            
+            // Auto-return to appointments view after successful booking/update
+            // Use CardLayout to switch back to appointmentsView
+            java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
+            cl.show(appointmentsTab, "card6");  // card6 is the appointmentsView card
+            
+        } catch (Exception e) {
+            javax.swing.JOptionPane.showMessageDialog(this, "Error booking appointment: " + e.getMessage());
+            logger.severe("Error booking appointment: " + e.getMessage());
+        }
     }//GEN-LAST:event_bookBtnActionPerformed
 
     private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
-        // TODO add your handling code here:
+        javax.swing.JOptionPane.showMessageDialog(this, "Attestation request submitted.");
+        logger.info("Attestation request submitted");
     }//GEN-LAST:event_jButton6ActionPerformed
 
     private void newBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newBtnActionPerformed
-        // TODO add your handling code here:
+        // Reset the form for a new appointment
+        appointmentBeingModified = null;
+        bookBtn.setText("Book");
+        
+        // Clear form fields
+        consultationType.setSelectedIndex(0);
+        location.setSelectedIndex(0);
+        personnel.setSelectedIndex(0);
+        roomType.setSelectedIndex(0);
+        date.setDate(new java.util.Date()); // Set to today
+        if (timePicker != null) {
+            timePicker.setSelectedTime("09:00"); // Default time
+        }
+        
+        // Show the book panel using CardLayout
+        java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
+        cl.show(appointmentsTab, "card3");  // card3 is the bookPanel card
+        logger.info("New appointment form opened");
     }//GEN-LAST:event_newBtnActionPerformed
 
     private void modifyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_modifyBtnActionPerformed
-        // TODO add your handling code here:
+        int selectedRow = appointmentsTable.getSelectedRow();
+        if (selectedRow >= 0) {
+            Appointment selected = appointmentModel.getAppointmentAt(selectedRow);
+            appointmentBeingModified = selected; // Track which appointment is being modified
+            
+            // Pre-fill the booking form with current appointment details
+            try {
+                // Set all form fields to the appointment's current values
+                consultationType.setSelectedItem(selected.getAttribute("consultationType") != null ? 
+                    selected.getAttribute("consultationType") : "General Consultation");
+                
+                location.setSelectedItem(selected.getLocation());
+                personnel.setSelectedItem(selected.getDoctor());
+                
+                // Scroll to date in calendar
+                java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                java.time.LocalDate aptDate = java.time.LocalDate.parse(selected.getDate(), formatter);
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.set(aptDate.getYear(), aptDate.getMonthValue() - 1, aptDate.getDayOfMonth());
+                date.setDate(cal.getTime());
+                
+                // Set time in time picker
+                if (timePicker != null) {
+                    timePicker.setSelectedTime(selected.getTime());
+                }
+                
+                // Change button text and navigate to booking form
+                bookBtn.setText("Update Appointment");
+                mainTabs.setSelectedIndex(1); // Navigate to Appointments tab
+                java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
+                cl.show(appointmentsTab, "card3");  // Show booking panel
+                javax.swing.JOptionPane.showMessageDialog(this, 
+                    "Modify the appointment details and click 'Update Appointment' to save changes.",
+                    "Modify Appointment",
+                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                logger.info("Loaded appointment for modification: " + selected.getDate());
+            } catch (Exception e) {
+                logger.severe("Error loading appointment for modification: " + e.getMessage());
+                javax.swing.JOptionPane.showMessageDialog(this, 
+                    "Error loading appointment: " + e.getMessage());
+            }
+        } else {
+            javax.swing.JOptionPane.showMessageDialog(this, "Please select an appointment to modify.");
+        }
     }//GEN-LAST:event_modifyBtnActionPerformed
 
     private void cancelAppBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelAppBtnActionPerformed
-        // TODO add your handling code here:
+        int selectedRow = appointmentsTable.getSelectedRow();
+        if (selectedRow >= 0) {
+            Appointment selected = appointmentModel.getAppointmentAt(selectedRow);
+            int option = javax.swing.JOptionPane.showConfirmDialog(this, 
+                "Cancel appointment: " + selected.getDate() + " with " + selected.getDoctor() + "?");
+            if (option == javax.swing.JOptionPane.YES_OPTION) {
+                appointmentManager.cancelAppointment(selected);
+                javax.swing.JOptionPane.showMessageDialog(this, "Appointment cancelled successfully.");
+                logger.info("Appointment cancelled");
+            }
+        } else {
+            javax.swing.JOptionPane.showMessageDialog(this, "Please select an appointment to cancel.");
+        }
     }//GEN-LAST:event_cancelAppBtnActionPerformed
 
     private void applyFilterBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyFilterBtnActionPerformed
-        // TODO add your handling code here:
+        int selectedIndex = timePeriodList.getSelectedIndex();
+        if (selectedIndex >= 0) {
+            String selected = timePeriodList.getModel().getElementAt(selectedIndex);
+            applyDateFilter(selected);
+            logger.info("Filter applied: " + selected);
+        }
     }//GEN-LAST:event_applyFilterBtnActionPerformed
+    
+    /**
+     * Apply date-based filtering to appointments table.
+     */
+    private void applyDateFilter(String filterType) {
+        try {
+            java.util.List<Appointment> allAppointments = appointmentManager.getAllAppointments();
+            java.time.LocalDate now = java.time.LocalDate.now();
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
+            
+            // Rebuild model with all appointments first
+            appointmentModel = new AppointmentTableModel();
+            
+            for (Appointment apt : allAppointments) {
+                try {
+                    java.time.LocalDate aptDate = java.time.LocalDate.parse(apt.getDate(), formatter);
+                    boolean include = false;
+                    
+                    switch (filterType) {
+                        case "Today":
+                            include = aptDate.equals(now);
+                            break;
+                        case "This Week":
+                            include = !aptDate.isBefore(now) && !aptDate.isAfter(now.plusDays(7));
+                            break;
+                        case "All Upcoming":
+                            include = !aptDate.isBefore(now);
+                            break;
+                        case "Past Appointments":
+                            include = aptDate.isBefore(now);
+                            break;
+                    }
+                    
+                    if (include) {
+                        appointmentModel.addAppointment(apt);
+                    }
+                } catch (Exception e) {
+                    // Skip invalid dates
+                }
+            }
+            
+            appointmentsTable.setModel(appointmentModel);
+        } catch (Exception e) {
+            logger.severe("Error applying filter: " + e.getMessage());
+        }
+    }
 
     private void cancelBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelBtnActionPerformed
-        // TODO add your handling code here:
+        // Show the appointments view panel using CardLayout
+        java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
+        cl.show(appointmentsTab, "card6");  // card6 is the appointmentsView card
+        logger.info("New appointment form cancelled");
     }//GEN-LAST:event_cancelBtnActionPerformed
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
-        // TODO add your handling code here:
+        javax.swing.JOptionPane.showMessageDialog(this, "Opening billing modification panel...");
+        logger.info("Billing modification opened");
     }//GEN-LAST:event_jButton7ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // TODO add your handling code here:
+        // Navigate to Appointments tab
+        mainTabs.setSelectedIndex(1); // 1 = Appointments tab
+        logger.info("Navigated to Appointments tab from home page");
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-        // TODO add your handling code here:
+        // Navigate to Appointments tab
+        mainTabs.setSelectedIndex(1); // 1 = Appointments tab
+        logger.info("Navigated to Appointments tab from home page");
     }//GEN-LAST:event_jButton2ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
-        // TODO add your handling code here:
+        // Navigate to Appointments tab
+        mainTabs.setSelectedIndex(1); // 1 = Appointments tab
+        logger.info("Navigated to Appointments tab from home page");
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
-        // TODO add your handling code here:
+        String selected = (String) jComboBox1.getSelectedItem();
+        logger.info("Theme selected: " + selected);
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
     private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
-        // TODO add your handling code here:
+        String optionName = jTextField1.getText();
+        String category = (String) jComboBox6.getSelectedItem();
+        logger.info("Adding option: " + optionName + " to category: " + category);
     }//GEN-LAST:event_jTextField1ActionPerformed
 
     /**
@@ -834,6 +1402,64 @@ public class MainFrame extends javax.swing.JFrame {
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(() -> new MainFrame().setVisible(true));
+    }
+    
+    // ============ OBSERVER PATTERN IMPLEMENTATIONS ============
+    
+    @Override
+    public void onFeaturesActivated(java.util.List<String> features) {
+        for (String feature : features) {
+            logger.info("Feature activated in UI: " + feature);
+            // TODO: Update UI based on activated feature
+        }
+    }
+    
+    @Override
+    public void onFeaturesDeactivated(java.util.List<String> features) {
+        for (String feature : features) {
+            logger.info("Feature deactivated in UI: " + feature);
+            // TODO: Update UI based on deactivated feature
+        }
+    }
+    
+    @Override
+    public void onInsuranceLevelChanged(FeatureManager.InsuranceLevel level) {
+        logger.info("Insurance level changed to: " + level);
+        updateProfileDisplay();
+        // TODO: Update available appointment options based on insurance
+    }
+    
+    @Override
+    public void onPatientChanged(PatientManager.Patient patient) {
+        logger.info("Patient changed");
+        updateProfileDisplay();
+    }
+    
+    @Override
+    public void onPatientUpdated(PatientManager.Patient patient) {
+        logger.info("Patient information updated");
+        updateProfileDisplay();
+    }
+    
+    @Override
+    public void onAppointmentAdded(Appointment appointment) {
+        logger.info("Appointment added: " + appointment.getDate());
+        appointmentModel.addAppointment(appointment);
+        updateHomePageAppointments();
+    }
+    
+    @Override
+    public void onAppointmentRemoved(Appointment appointment) {
+        logger.info("Appointment removed");
+        appointmentModel.removeAppointment(appointmentModel.getFilteredAppointmentCount() - 1);
+        updateHomePageAppointments();
+    }
+    
+    @Override
+    public void onAppointmentUpdated(Appointment appointment) {
+        logger.info("Appointment updated");
+        appointmentModel.applyFilter(appointmentModel.getFilteredAppointmentCount() > 0 ? "" : "");
+        updateHomePageAppointments();
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
