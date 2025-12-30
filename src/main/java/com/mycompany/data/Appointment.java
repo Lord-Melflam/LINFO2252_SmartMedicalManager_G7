@@ -1,5 +1,6 @@
-package com.mycompany.ui.model;
+package com.mycompany.data;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -64,6 +65,25 @@ public class Appointment {
 
     public void setDate(String date) {
         this.date = date;
+    }
+
+    public Date getDateAsDate() {
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            sdf.setLenient(false);
+            return sdf.parse(this.date);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public void setDateFromDate(Date date) {
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            this.date = sdf.format(date);
+        } catch (Exception e) {
+            // Ignore
+        }
     }
     
     public String getTime() {

@@ -1,4 +1,6 @@
-package com.mycompany.model;
+package com.mycompany.data;
+
+import com.mycompany.model.Logger;
 
 import java.util.*;
 
@@ -23,7 +25,6 @@ public class DataProvider {
     
     private final Map<String, List<String>> optionsMap;
     private final Logger logger = Logger.getInstance();
-    private static final String TAG = "DataProvider";
     
     private DataProvider() {
         this.optionsMap = new HashMap<>();
@@ -124,7 +125,7 @@ public class DataProvider {
             "Phone",
             "SMS"
         ));
-        logger.log(TAG, "Options initialized.");
+        logger.log("DataProvider", "Options initialized.");
     }
     
     /**
@@ -157,7 +158,7 @@ public class DataProvider {
      */
     public void addOption(String category, String option) {
         optionsMap.computeIfAbsent(category, k -> new ArrayList<>()).add(option);
-        logger.log(TAG, "Added option '" + option + "' to category '" + category + "'.");
+        logger.log("DataProvider", "Added option '" + option + "' to category '" + category + "'.");
     }
     
     /**
@@ -165,7 +166,7 @@ public class DataProvider {
      */
     public void addOptions(String category, List<String> options) {
         optionsMap.computeIfAbsent(category, k -> new ArrayList<>()).addAll(options);
-        logger.log(TAG, "Added options to category '" + category + "'.");
+        logger.log("DataProvider", "Added options to category '" + category + "'.");
     }
 
     /**
@@ -174,7 +175,7 @@ public class DataProvider {
     public void removeOption(String category, String option) {
         List<String> options = optionsMap.get(category);
         if (options != null && options.remove(option)) {
-            logger.log(TAG, "Removed option '" + option + "' from category '" + category + "'.");
+            logger.log("DataProvider", "Removed option '" + option + "' from category '" + category + "'.");
         }
     }
 
@@ -183,7 +184,7 @@ public class DataProvider {
      */
     public void removeCategory(String category) {
         optionsMap.remove(category);
-        logger.log(TAG, "Cleared options for category '" + category + "'.");
+        logger.log("DataProvider", "Cleared options for category '" + category + "'.");
     }
     
     /**

@@ -1,9 +1,12 @@
 package com.mycompany.ui.components;
 
 import javax.swing.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+
+import com.mycompany.model.TimeEventManager;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 
 /**
  * Appointment filter panel for filtering by date range and status.
@@ -12,6 +15,7 @@ import java.util.*;
 public class AppointmentFilterPanel extends JPanel {
     private final JComboBox<String> filterComboBox;
     private FilterChangedListener filterListener;
+    private final static TimeEventManager timeEventManager = TimeEventManager.getInstance();
     
     public interface FilterChangedListener {
         void onFilterChanged(AppointmentFilter filter);
@@ -22,33 +26,70 @@ public class AppointmentFilterPanel extends JPanel {
             TODAY, THIS_WEEK, ALL_UPCOMING, PAST, ALL
         }
         
-        private FilterType type;
-        private LocalDate startDate;
-        private LocalDate endDate;
+        private final FilterType type;
+        private Date startDate;
+        private Date endDate;
         
         public AppointmentFilter(FilterType type) {
             this.type = type;
             calculateDateRange();
         }
         
+        private static Date atStartOfDay(Date d) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(d);
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+            return cal.getTime();
+        }
+        
+        private static Date atEndOfDay(Date d) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(d);
+            cal.set(Calendar.HOUR_OF_DAY, 23);
+            cal.set(Calendar.MINUTE, 59);
+            cal.set(Calendar.SECOND, 59);
+            cal.set(Calendar.MILLISECOND, 999);
+            return cal.getTime();
+        }
+        
+        private static Date addDays(Date d, int days) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(d);
+            cal.add(Calendar.DAY_OF_YEAR, days);
+            return cal.getTime();
+        }
+        
+        private static Date addYears(Date d, int years) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(d);
+            cal.add(Calendar.YEAR, years);
+            return cal.getTime();
+        }
+        
         private void calculateDateRange() {
-            LocalDate now = LocalDate.now();
+            Date now = timeEventManager.getDate(); 
+            Date todayStart = atStartOfDay(now);
+            Date todayEnd = atEndOfDay(now);
+            
             switch (type) {
                 case TODAY:
-                    startDate = now;
-                    endDate = now;
+                    startDate = todayStart;
+                    endDate = todayEnd;
                     break;
                 case THIS_WEEK:
-                    startDate = now;
-                    endDate = now.plusDays(7);
+                    startDate = todayStart;
+                    endDate = atEndOfDay(addDays(todayStart, 7));
                     break;
                 case ALL_UPCOMING:
-                    startDate = now;
-                    endDate = now.plusYears(1);
+                    startDate = todayStart;
+                    endDate = atEndOfDay(addYears(todayStart, 1));
                     break;
                 case PAST:
-                    startDate = now.minusYears(1);
-                    endDate = now;
+                    startDate = atStartOfDay(addYears(todayStart, -1));
+                    endDate = todayEnd;
                     break;
                 case ALL:
                     startDate = null;
@@ -61,9 +102,14 @@ public class AppointmentFilterPanel extends JPanel {
             if (type == FilterType.ALL) return true;
             
             try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                LocalDate appointmentDate = LocalDate.parse(appointmentDateStr, formatter);
-                return !appointmentDate.isBefore(startDate) && !appointmentDate.isAfter(endDate);
+                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+                sdf.setLenient(false);
+                
+                Date apptDay = sdf.parse(appointmentDateStr);
+                Date apptStart = atStartOfDay(apptDay);
+                Date apptEnd = atEndOfDay(apptDay);
+                
+                return !apptEnd.before(startDate) && !apptStart.after(endDate); // overlap with range
             } catch (Exception e) {
                 return false;
             }

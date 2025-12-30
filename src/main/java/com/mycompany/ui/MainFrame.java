@@ -4,13 +4,32 @@
  */
 package com.mycompany.ui;
 
-import com.mycompany.ui.model.Appointment;
-import com.mycompany.ui.model.AppointmentTableModel;
+import com.formdev.flatlaf.FlatDarculaLaf;
+import com.formdev.flatlaf.FlatLaf;
+import com.formdev.flatlaf.FlatLightLaf;
+import com.mycompany.data.Appointment;
+import com.mycompany.data.AppointmentTableModel;
+import com.mycompany.data.DataProvider;
+import com.mycompany.data.Notification;
 import com.mycompany.model.*;
 import com.mycompany.ui.components.*;
-import java.util.Arrays;
+
+import javax.swing.*;
+import javax.swing.table.TableRowSorter;
+
+import java.text.SimpleDateFormat;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 
 /**
  * Main application frame for the Smart Medical Manager.
@@ -19,10 +38,13 @@ import java.time.format.DateTimeFormatter;
  *
  * @author Ji
  */
-public class MainFrame extends javax.swing.JFrame implements FeatureObserver, PatientObserver, AppointmentObserver {
+public class MainFrame extends javax.swing.JFrame implements FeatureObserver, PatientObserver, AppointmentObserver, NotificationObserver {
     
-    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MainFrame.class.getName());
-    
+    private static final Logger logger = Logger.getInstance();
+    private static final String TAG = "View";
+    private static final DateTimeFormatter UI_DATE_FMT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private static final DateTimeFormatter UI_TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
+
     private AppointmentTableModel appointmentModel;
     private AppointmentManager appointmentManager;
     private FeatureManager featureManager;
@@ -31,26 +53,38 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private TimePickerPanel timePicker;
     private boolean showUpcomingOnHome = true; // Toggle for home page appointments
     private Appointment appointmentBeingModified = null; // Track which appointment is being edited
+    private AppointmentNotificationManager appointmentNotificationManager;
+    private NotificationManager notificationManager;
+    private TimeEventManager timeEventManager;
+    private DefaultListModel<String> notificationListModel;
+    private javax.swing.JScrollPane adminFeatureScroll;
+    private javax.swing.JPanel adminFeaturePanel;
+    private final Map<String, JPanel> adminFeatureRows = new HashMap<>();
+    private TableRowSorter<AppointmentTableModel> appointmentSorter;
 
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
         initComponents();
-        
-        // Initialize Model managers
+
         this.appointmentManager = AppointmentManager.getInstance();
         this.featureManager = FeatureManager.getInstance();
         this.patientManager = PatientManager.getInstance();
         this.dataProvider = DataProvider.getInstance();
-        
+        this.timeEventManager = TimeEventManager.getInstance();
+        this.notificationManager = NotificationManager.getInstance();
+
         // Register as observer for model changes
         appointmentManager.registerObserver(this);
         featureManager.registerObserver(this);
         patientManager.registerObserver(this);
+        notificationManager.registerObserver(this);
         
-        // Initialize UI with data
+        appointmentNotificationManager = new AppointmentNotificationManager(notificationManager, timeEventManager);
+        
         initializeUI();
+        logger.log(TAG, "MainFrame constructed and UI initialized.");
     }
     
     /**
@@ -65,6 +99,190 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         updateProfileDisplay();
         initializeFeatureCheckboxes();
         updateHomePageAppointments();
+        buildAdminFeatureControls();
+        refreshFeatureUI();
+        bindTimeEventSystem();
+    }
+
+    private void bindTimeEventSystem() {
+        try {
+            jCalendar1.addPropertyChangeListener("calendar", evt -> onAdminCalendarChanged());
+            jCalendar1.addPropertyChangeListener("date", evt -> onAdminCalendarChanged());
+        } catch (Exception e) {
+            logger.logError(TAG, "Failed to bind time event calendar: " + e.getMessage());
+        }
+    }
+
+    private void onAdminCalendarChanged() {
+        try {
+            java.util.Date d = jCalendar1.getDate();
+            if (d == null) return;
+
+            timeEventManager.setDate(d);
+            logger.log(TAG, "Admin calendar changed, updated TimeEventManager date.");
+        } catch (Exception e) {
+            logger.logError(TAG, "Error applying time event calendar selection: " + e.getMessage());
+        }
+    }
+
+    private void refreshFeatureUI() {
+        SwingUtilities.invokeLater(() -> {
+            updateThemeByFeatures();
+            updateFilterByFeatures();
+            updateSortingByFeatures();
+            updateBookingDropdownsByFeatures();
+            updateSearchByFeatures();
+        });
+    }
+
+    private void updateSortingByFeatures() {
+        boolean sortEnabled = featureManager.isFeatureActive("Sort");
+
+        if (!sortEnabled) {
+            appointmentSorter = null;
+            appointmentsTable.setRowSorter(null);
+            return;
+        }
+
+        if (appointmentSorter == null || appointmentsTable.getRowSorter() != appointmentSorter) {
+            appointmentSorter = new TableRowSorter<>(appointmentModel);
+
+            appointmentSorter.setComparator(0, (a, b) -> {
+                try {
+                    LocalDate da = LocalDate.parse(String.valueOf(a), UI_DATE_FMT);
+                    LocalDate db = LocalDate.parse(String.valueOf(b), UI_DATE_FMT);
+                    return da.compareTo(db);
+                } catch (Exception ignored) {
+                    return String.valueOf(a).compareToIgnoreCase(String.valueOf(b));
+                }
+            });
+
+            appointmentSorter.setComparator(1, (a, b) -> {
+                try {
+                    LocalTime ta = LocalTime.parse(String.valueOf(a), UI_TIME_FMT);
+                    LocalTime tb = LocalTime.parse(String.valueOf(b), UI_TIME_FMT);
+                    return ta.compareTo(tb);
+                } catch (Exception ignored) {
+                    return String.valueOf(a).compareToIgnoreCase(String.valueOf(b));
+                }
+            });
+
+            appointmentsTable.setRowSorter(appointmentSorter);
+        }
+
+        boolean sortByDate = featureManager.isFeatureActive("SortByDate");
+        boolean sortByType = featureManager.isFeatureActive("SortByType");
+        boolean sortByService = featureManager.isFeatureActive("SortByService");
+
+        // Column mapping in AppointmentTableModel:
+        // 0 Date, 1 Time, 2 Doctor, 3 Location, 4 Reason, 5 Status
+        //
+        // SortByDate -> Date + Time
+        appointmentSorter.setSortable(0, sortByDate);
+        appointmentSorter.setSortable(1, sortByDate);
+
+        // SortByService -> Doctor + Location (service/staff-related)
+        appointmentSorter.setSortable(2, sortByService);
+        appointmentSorter.setSortable(3, sortByService);
+
+        // SortByType -> Reason (consultation type/reason)
+        appointmentSorter.setSortable(4, sortByType);
+        appointmentSorter.setSortable(5, true);
+    }
+
+    private void updateFilterByFeatures() {
+        boolean pastEnabled = featureManager.isFeatureActive("PastConsultations");
+        String currentlySelected = timePeriodList.getSelectedValue();
+
+        java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("Today");
+        items.add("This Week");
+        items.add("All Upcoming");
+        if (pastEnabled) {
+            items.add("Past Appointments");
+        }
+
+        timePeriodList.setModel(new javax.swing.AbstractListModel<String>() {
+            @Override
+            public int getSize() { return items.size(); }
+            @Override
+            public String getElementAt(int i) { return items.get(i); }
+        });
+
+        if (currentlySelected != null && items.contains(currentlySelected)) {
+            timePeriodList.setSelectedValue(currentlySelected, true);
+        } else if (!items.isEmpty()) {
+            timePeriodList.setSelectedIndex(0);
+        }
+    }
+
+    private void updateThemeByFeatures() {
+        boolean dark = featureManager.isFeatureActive("DarkMode");
+        try {
+            if (dark) {
+                FlatDarculaLaf.setup();
+            } else {
+                FlatLightLaf.setup();
+            }
+            FlatLaf.updateUI();
+            SwingUtilities.updateComponentTreeUI(this);
+            this.repaint();
+        } catch (Exception e) {
+            logger.logError(TAG, "Failed to apply theme: " + e.getMessage());
+        }
+    }
+
+    private void updateSearchByFeatures() {
+        boolean searchEnabled = featureManager.isFeatureActive("BasicSearch") || featureManager.isFeatureActive("AdvancedSearch");
+        searchBar.setEnabled(searchEnabled);
+        // disable filter too
+        applyFilterBtn.setEnabled(searchEnabled);
+
+        if (!searchEnabled) {
+            appointmentModel.clearFilter();
+        }
+    }
+
+    private void updateBookingDropdownsByFeatures() {
+        consultationType.setEnabled(featureManager.isFeatureActive("ConsultationType"));
+        location.setEnabled(featureManager.isFeatureActive("ConsultationLocation"));
+        roomType.setEnabled(featureManager.isFeatureActive("RoomType"));
+        personnel.setEnabled(featureManager.isFeatureActive("Personel"));
+    }
+
+    private void buildAdminFeatureControls() {
+        adminFeaturePanel.removeAll();
+        adminFeatureRows.clear();
+
+        for (String feature : FeatureManager.getAvailableFeatures()) {
+            if (featureManager.isMandatory(feature)) {
+                continue; 
+            }
+
+            logger.log(TAG, "Building admin control for feature: " + feature);
+
+            javax.swing.JPanel row = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 8, 2));
+            javax.swing.JCheckBox toggle = new javax.swing.JCheckBox(feature);
+            toggle.setSelected(featureManager.isFeatureActive(feature));
+            toggle.addActionListener(e -> handleFeatureToggle(feature, toggle.isSelected(), toggle));
+
+            javax.swing.JButton configBtn = new javax.swing.JButton("Configure");
+            configBtn.addActionListener(e -> {
+                Object existing = featureManager.getFeatureAttribute(feature, "value");
+                String val = javax.swing.JOptionPane.showInputDialog(this, "Set value for " + feature, existing);
+                if (val != null) {
+                    featureManager.setFeatureAttribute(feature, "value", val);
+                }
+            });
+
+            row.add(toggle);
+            row.add(configBtn);
+            adminFeatureRows.put(feature, row);
+            adminFeaturePanel.add(row);
+        }
+
+        adminFeaturePanel.revalidate();
+        adminFeaturePanel.repaint();
     }
 
     /**
@@ -75,7 +293,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
-
+        adminFeaturePanel = new javax.swing.JPanel();
+        adminFeatureScroll = new javax.swing.JScrollPane();
         jPopupMenu1 = new javax.swing.JPopupMenu();
         mainTabs = new javax.swing.JTabbedPane();
         homeTab = new javax.swing.JPanel();
@@ -199,33 +418,33 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout homeTabLayout = new javax.swing.GroupLayout(homeTab);
         homeTab.setLayout(homeTabLayout);
         homeTabLayout.setHorizontalGroup(
-            homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(homeTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(upcomingAppointments)
-                    .addComponent(jLabel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 783, Short.MAX_VALUE)
-                    .addComponent(notificationsRemindersList)
-                    .addGroup(homeTabLayout.createSequentialGroup()
-                        .addComponent(jLabel6)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(toggleAppointmentsBtn)))
-                .addContainerGap())
+                homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(homeTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(upcomingAppointments)
+                                        .addComponent(jLabel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 783, Short.MAX_VALUE)
+                                        .addComponent(notificationsRemindersList)
+                                        .addGroup(homeTabLayout.createSequentialGroup()
+                                                .addComponent(jLabel6)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                                .addComponent(toggleAppointmentsBtn)))
+                                .addContainerGap())
         );
         homeTabLayout.setVerticalGroup(
-            homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(homeTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(toggleAppointmentsBtn))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(upcomingAppointments, javax.swing.GroupLayout.PREFERRED_SIZE, 451, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(notificationsRemindersList, javax.swing.GroupLayout.PREFERRED_SIZE, 216, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(homeTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(homeTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                        .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addComponent(toggleAppointmentsBtn))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(upcomingAppointments, javax.swing.GroupLayout.PREFERRED_SIZE, 451, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 17, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(notificationsRemindersList, javax.swing.GroupLayout.PREFERRED_SIZE, 216, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         mainTabs.addTab("Home", homeTab);
@@ -248,7 +467,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         newBtn.setText("New Appointment");
         newBtn.addActionListener(this::newBtnActionPerformed);
 
-    filterLabel.setText("Search & Filters");
+        filterLabel.setText("Search & Filters");
 
         appointmentOpsLabel.setText("Appointment Operations");
 
@@ -276,50 +495,50 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout appointmentsViewLayout = new javax.swing.GroupLayout(appointmentsView);
         appointmentsView.setLayout(appointmentsViewLayout);
         appointmentsViewLayout.setHorizontalGroup(
-            appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(appointmentsViewLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(modifyBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(newBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(applyFilterBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(filterSeparator)
-                    .addComponent(searchBar)
-                    .addComponent(cancelAppBtn, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(filterLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(appointmentOpsLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addGroup(appointmentsViewLayout.createSequentialGroup()
-                        .addGap(0, 2, Short.MAX_VALUE)
-                        .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(18, 18, 18)
-                .addComponent(appointmentsTableScroll, javax.swing.GroupLayout.PREFERRED_SIZE, 593, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap())
+                appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(appointmentsViewLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(modifyBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(newBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(applyFilterBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(filterSeparator)
+                                        .addComponent(searchBar)
+                                        .addComponent(cancelAppBtn, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(filterLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(appointmentOpsLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addGroup(appointmentsViewLayout.createSequentialGroup()
+                                                .addGap(0, 2, Short.MAX_VALUE)
+                                                .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                .addGap(18, 18, 18)
+                                .addComponent(appointmentsTableScroll, javax.swing.GroupLayout.PREFERRED_SIZE, 593, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addContainerGap())
         );
         appointmentsViewLayout.setVerticalGroup(
-            appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(appointmentsViewLayout.createSequentialGroup()
-                .addGap(10, 10, 10)
-                .addGroup(appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(appointmentsTableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 726, Short.MAX_VALUE)
-                    .addGroup(appointmentsViewLayout.createSequentialGroup()
-                        .addComponent(filterLabel)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 78, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(14, 14, 14)
-                        .addComponent(applyFilterBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(filterSeparator, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(appointmentOpsLabel)
-                        .addGap(18, 18, 18)
-                        .addComponent(newBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(modifyBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(cancelAppBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addContainerGap())))
+                appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(appointmentsViewLayout.createSequentialGroup()
+                                .addGap(10, 10, 10)
+                                .addGroup(appointmentsViewLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(appointmentsTableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 726, Short.MAX_VALUE)
+                                        .addGroup(appointmentsViewLayout.createSequentialGroup()
+                                                .addComponent(filterLabel)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                                .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 78, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(14, 14, 14)
+                                                .addComponent(applyFilterBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                                .addComponent(filterSeparator, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(18, 18, 18)
+                                                .addComponent(appointmentOpsLabel)
+                                                .addGap(18, 18, 18)
+                                                .addComponent(newBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(18, 18, 18)
+                                                .addComponent(modifyBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(18, 18, 18)
+                                                .addComponent(cancelAppBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addContainerGap())))
         );
 
         appointmentsTab.add(appointmentsView, "card6");
@@ -353,60 +572,60 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout bookPanelLayout = new javax.swing.GroupLayout(bookPanel);
         bookPanel.setLayout(bookPanelLayout);
         bookPanelLayout.setHorizontalGroup(
-            bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(bookPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(bookPanelLayout.createSequentialGroup()
-                        .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(consultationType, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(bookPanelLayout.createSequentialGroup()
-                        .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(location, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(bookPanelLayout.createSequentialGroup()
-                        .addComponent(jLabel9, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(personnel, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(bookPanelLayout.createSequentialGroup()
-                        .addComponent(jLabel10, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(roomType, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(cancelBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 378, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 28, Short.MAX_VALUE)
-                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(date, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 242, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(bookBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 377, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap())
+                bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                                .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(consultationType, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                                .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(location, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                                .addComponent(jLabel9, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(personnel, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                                .addComponent(jLabel10, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(roomType, javax.swing.GroupLayout.PREFERRED_SIZE, 182, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addComponent(cancelBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 378, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 28, Short.MAX_VALUE)
+                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(date, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 242, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addComponent(bookBtn, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 377, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addContainerGap())
         );
         bookPanelLayout.setVerticalGroup(
-            bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(bookPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(bookPanelLayout.createSequentialGroup()
-                        .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addComponent(consultationType)
-                            .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addComponent(location)
-                            .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addComponent(personnel)
-                            .addComponent(jLabel9, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addComponent(roomType)
-                            .addComponent(jLabel10, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                    .addComponent(date, javax.swing.GroupLayout.PREFERRED_SIZE, 221, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 452, Short.MAX_VALUE)
-                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(bookBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 51, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(cancelBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 51, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap())
+                bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addGroup(bookPanelLayout.createSequentialGroup()
+                                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                                                        .addComponent(consultationType)
+                                                        .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                                                        .addComponent(location)
+                                                        .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                                                        .addComponent(personnel)
+                                                        .addComponent(jLabel9, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                                                        .addComponent(roomType)
+                                                        .addComponent(jLabel10, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                        .addComponent(date, javax.swing.GroupLayout.PREFERRED_SIZE, 221, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 452, Short.MAX_VALUE)
+                                .addGroup(bookPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                        .addComponent(bookBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 51, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addComponent(cancelBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 51, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addContainerGap())
         );
 
         appointmentsTab.add(bookPanel, "card3");
@@ -430,37 +649,37 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout jPanel8Layout = new javax.swing.GroupLayout(jPanel8);
         jPanel8.setLayout(jPanel8Layout);
         jPanel8Layout.setHorizontalGroup(
-            jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel8Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane2)
-                    .addGroup(jPanel8Layout.createSequentialGroup()
-                        .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel12)
-                            .addComponent(jLabel13)
-                            .addComponent(jLabel14)
-                            .addComponent(jLabel15)
-                            .addComponent(jLabel16))
-                        .addGap(0, 511, Short.MAX_VALUE)))
-                .addContainerGap())
+                jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel8Layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(jScrollPane2)
+                                        .addGroup(jPanel8Layout.createSequentialGroup()
+                                                .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                                        .addComponent(jLabel12)
+                                                        .addComponent(jLabel13)
+                                                        .addComponent(jLabel14)
+                                                        .addComponent(jLabel15)
+                                                        .addComponent(jLabel16))
+                                                .addGap(0, 511, Short.MAX_VALUE)))
+                                .addContainerGap())
         );
         jPanel8Layout.setVerticalGroup(
-            jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel8Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jLabel12)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel13)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel14)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel15)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel16)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 68, Short.MAX_VALUE)
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap())
+                jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel8Layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addComponent(jLabel12)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel13)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel14)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel15)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel16)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 68, Short.MAX_VALUE)
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addContainerGap())
         );
 
         jLabel11.setText("Profile Image");
@@ -474,23 +693,23 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout jPanel9Layout = new javax.swing.GroupLayout(jPanel9);
         jPanel9.setLayout(jPanel9Layout);
         jPanel9Layout.setHorizontalGroup(
-            jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel9Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel11, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jButton6, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jButton7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap())
+                jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel9Layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(jLabel11, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(jButton6, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(jButton7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addContainerGap())
         );
         jPanel9Layout.setVerticalGroup(
-            jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel9Layout.createSequentialGroup()
-                .addComponent(jLabel11, javax.swing.GroupLayout.PREFERRED_SIZE, 141, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jButton7, javax.swing.GroupLayout.PREFERRED_SIZE, 54, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(jButton6, javax.swing.GroupLayout.PREFERRED_SIZE, 54, javax.swing.GroupLayout.PREFERRED_SIZE))
+                jPanel9Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel9Layout.createSequentialGroup()
+                                .addComponent(jLabel11, javax.swing.GroupLayout.PREFERRED_SIZE, 141, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(jButton7, javax.swing.GroupLayout.PREFERRED_SIZE, 54, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(18, 18, 18)
+                                .addComponent(jButton6, javax.swing.GroupLayout.PREFERRED_SIZE, 54, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
 
         jLabel18.setText("Billing Information");
@@ -502,53 +721,53 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jLabel18)
-                .addContainerGap(533, Short.MAX_VALUE))
-            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 632, Short.MAX_VALUE)
-                    .addContainerGap()))
+                jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addComponent(jLabel18)
+                                .addContainerGap(533, Short.MAX_VALUE))
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 632, Short.MAX_VALUE)
+                                        .addContainerGap()))
         );
         jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jLabel18)
-                .addContainerGap(405, Short.MAX_VALUE))
-            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                .addGroup(jPanel1Layout.createSequentialGroup()
-                    .addGap(38, 38, 38)
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addContainerGap(276, Short.MAX_VALUE)))
+                jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addContainerGap()
+                                .addComponent(jLabel18)
+                                .addContainerGap(405, Short.MAX_VALUE))
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addGroup(jPanel1Layout.createSequentialGroup()
+                                        .addGap(38, 38, 38)
+                                        .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addContainerGap(276, Short.MAX_VALUE)))
         );
 
         javax.swing.GroupLayout profileTabLayout = new javax.swing.GroupLayout(profileTab);
         profileTab.setLayout(profileTabLayout);
         profileTabLayout.setHorizontalGroup(
-            profileTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(profileTabLayout.createSequentialGroup()
-                .addGroup(profileTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(profileTabLayout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                    .addComponent(jPanel8, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jPanel9, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                profileTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(profileTabLayout.createSequentialGroup()
+                                .addGroup(profileTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addGroup(profileTabLayout.createSequentialGroup()
+                                                .addContainerGap()
+                                                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                        .addComponent(jPanel8, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jPanel9, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
         profileTabLayout.setVerticalGroup(
-            profileTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(profileTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jPanel9, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGap(15, 15, 15))
-            .addGroup(profileTabLayout.createSequentialGroup()
-                .addComponent(jPanel8, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addContainerGap())
+                profileTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(profileTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addComponent(jPanel9, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addGap(15, 15, 15))
+                        .addGroup(profileTabLayout.createSequentialGroup()
+                                .addComponent(jPanel8, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addContainerGap())
         );
 
         mainTabs.addTab("Profile", profileTab);
@@ -596,62 +815,62 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         javax.swing.GroupLayout settingsTabLayout = new javax.swing.GroupLayout(settingsTab);
         settingsTab.setLayout(settingsTabLayout);
         settingsTabLayout.setHorizontalGroup(
-            settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(settingsTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 158, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(settingsTabLayout.createSequentialGroup()
-                        .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(settingsTabLayout.createSequentialGroup()
-                        .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jComboBox2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(settingsTabLayout.createSequentialGroup()
-                        .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jComboBox3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(settingsTabLayout.createSequentialGroup()
-                        .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jComboBox4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(settingsTabLayout.createSequentialGroup()
-                        .addComponent(jLabel17, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jComboBox5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(467, Short.MAX_VALUE))
+                settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 158, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                                .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(jComboBox2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                                .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(jComboBox3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                                .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(jComboBox4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                                .addComponent(jLabel17, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addComponent(jComboBox5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                .addContainerGap(467, Short.MAX_VALUE))
         );
         settingsTabLayout.setVerticalGroup(
-            settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(settingsTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane1)
-                    .addGroup(settingsTabLayout.createSequentialGroup()
-                        .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jComboBox1)
-                            .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jComboBox2)
-                            .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jComboBox3)
-                            .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jComboBox4)
-                            .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jComboBox5)
-                            .addComponent(jLabel17, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGap(0, 566, Short.MAX_VALUE)))
-                .addContainerGap())
+                settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(jScrollPane1)
+                                        .addGroup(settingsTabLayout.createSequentialGroup()
+                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                        .addComponent(jComboBox1)
+                                                        .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                        .addComponent(jComboBox2)
+                                                        .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                        .addComponent(jComboBox3)
+                                                        .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                        .addComponent(jComboBox4)
+                                                        .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                        .addComponent(jComboBox5)
+                                                        .addComponent(jLabel17, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addGap(0, 566, Short.MAX_VALUE)))
+                                .addContainerGap())
         );
 
         mainTabs.addTab("Settings", settingsTab);
@@ -669,49 +888,56 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
         jLabel19.setText("Time Event System");
 
+        adminFeaturePanel.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
+        adminFeatureScroll.setViewportView(adminFeaturePanel);
         javax.swing.GroupLayout adminTabLayout = new javax.swing.GroupLayout(adminTab);
         adminTab.setLayout(adminTabLayout);
         adminTabLayout.setHorizontalGroup(
-            adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(adminTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(adminTabLayout.createSequentialGroup()
-                        .addComponent(jComboBox6, javax.swing.GroupLayout.PREFERRED_SIZE, 137, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(jButton4, javax.swing.GroupLayout.PREFERRED_SIZE, 96, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 149, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(jLabel19)
-                    .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(371, Short.MAX_VALUE))
+                adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(adminTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                        .addComponent(adminFeatureScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 700, Short.MAX_VALUE)
+                                        .addGroup(adminTabLayout.createSequentialGroup()
+                                                .addComponent(jComboBox6, javax.swing.GroupLayout.PREFERRED_SIZE, 137, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(18, 18, 18)
+                                                .addComponent(jButton4, javax.swing.GroupLayout.PREFERRED_SIZE, 96, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(18, 18, 18)
+                                                .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 149, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addComponent(jLabel19)
+                                        .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addContainerGap())
         );
         adminTabLayout.setVerticalGroup(
-            adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(adminTabLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jButton4)
-                    .addComponent(jComboBox6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel19)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(532, Short.MAX_VALUE))
+                adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(adminTabLayout.createSequentialGroup()
+                                .addContainerGap()
+                                .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                        .addComponent(jComboBox6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addComponent(jButton4)
+                                        .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel19)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(adminFeatureScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
+                                .addContainerGap())
         );
+
+
 
         mainTabs.addTab("Admin", adminTab);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(mainTabs)
+                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addComponent(mainTabs)
         );
         layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(mainTabs, javax.swing.GroupLayout.Alignment.TRAILING)
+                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addComponent(mainTabs, javax.swing.GroupLayout.Alignment.TRAILING)
         );
 
         mainTabs.getAccessibleContext().setAccessibleName("mainTabs");
@@ -785,6 +1011,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
      * UI layer only handles getting the search text.
      */
     private void performSearch() {
+        if (!(featureManager.isFeatureActive("BasicSearch")) && !(featureManager.isFeatureActive("AdvancedSearch"))) {
+            appointmentModel.clearFilter();
+            return; 
+        }
+
         String searchText = searchBar.getText().trim();
         
         // Don't filter on the placeholder text
@@ -801,17 +1032,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
      */
     private void populateDropdowns() {
         consultationType.setModel(new javax.swing.DefaultComboBoxModel<>(
-            dataProvider.getOptionsArray("consultationTypes")
-        ));
+            dataProvider.getOptionsArray(DataProvider.CATEGORY_CONSULTATION_TYPES)));
         location.setModel(new javax.swing.DefaultComboBoxModel<>(
-            dataProvider.getOptionsArray("locations")
-        ));
+            dataProvider.getOptionsArray(DataProvider.CATEGORY_LOCATIONS)));
         personnel.setModel(new javax.swing.DefaultComboBoxModel<>(
-            dataProvider.getOptionsArray("personnel")
-        ));
+            dataProvider.getOptionsArray(DataProvider.CATEGORY_PERSONNEL)));
         roomType.setModel(new javax.swing.DefaultComboBoxModel<>(
-            dataProvider.getOptionsArray("roomTypes")
-        ));
+            dataProvider.getOptionsArray(DataProvider.CATEGORY_ROOM_TYPES)));
     }
     
     /**
@@ -831,7 +1058,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 }
             }
         } catch (Exception e) {
-            logger.warning("Could not fix calendar font: " + e.getMessage());
+            logger.logError(TAG, "Could not fix calendar font: " + e.getMessage());
         }
         
         // Add time picker to booking panel below the calendar
@@ -916,7 +1143,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 toggleAppointmentsBtn.setText(showUpcomingOnHome ? "Show Past Appointments" : "Show Upcoming Appointments");
             }
 
-            // Clear dynamic list and rebuild to auto-scale
             jPanel2.removeAll();
 
             if (appointments.isEmpty()) {
@@ -925,7 +1151,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                     "No past appointments found";
                 javax.swing.JLabel emptyLabel = new javax.swing.JLabel(emptyMessage);
                 jPanel2.add(emptyLabel);
-                // Hide notifications for past view
                 jLabel2.setVisible(showUpcomingOnHome);
                 notificationsRemindersList.setVisible(showUpcomingOnHome);
                 if (showUpcomingOnHome) {
@@ -937,8 +1162,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 // Build rows: [Label][View Details]
                 for (Appointment apt : appointments) {
                     try {
-                        java.time.LocalDate aptDate = java.time.LocalDate.parse(apt.getDate(), formatter);
-                        java.time.DayOfWeek dayOfWeek = aptDate.getDayOfWeek();
+                        LocalDate aptDate = LocalDate.parse(apt.getDate(), formatter);
+                        DayOfWeek dayOfWeek = aptDate.getDayOfWeek();
                         String dayName = dayOfWeek.toString().substring(0, 1).toUpperCase() +
                                 dayOfWeek.toString().substring(1).toLowerCase();
                         String display = dayName + " " + apt.getDate() +
@@ -948,7 +1173,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                         javax.swing.JButton viewBtn = new javax.swing.JButton("View Details");
                         viewBtn.addActionListener(ev -> {
                             mainTabs.setSelectedIndex(1); // Go to Appointments tab
-                            logger.info("Navigated to Appointments tab from home page");
+                            logger.log(TAG, "Navigated to Appointments tab from home page");
                         });
                         jPanel2.add(lbl);
                         jPanel2.add(viewBtn);
@@ -958,14 +1183,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                         javax.swing.JButton viewBtn = new javax.swing.JButton("View Details");
                         viewBtn.addActionListener(ev -> {
                             mainTabs.setSelectedIndex(1);
-                            logger.info("Navigated to Appointments tab from home page");
+                            logger.log(TAG, "Navigated to Appointments tab from home page");
                         });
                         jPanel2.add(lbl);
                         jPanel2.add(viewBtn);
                     }
                 }
 
-                // Notifications show only for upcoming
                 jLabel2.setVisible(showUpcomingOnHome);
                 notificationsRemindersList.setVisible(showUpcomingOnHome);
                 if (showUpcomingOnHome) {
@@ -983,7 +1207,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             jPanel2.revalidate();
             jPanel2.repaint();
         } catch (Exception e) {
-            logger.severe("Error updating home page: " + e.getMessage());
+            logger.logError(TAG, "Error updating home page: " + e.getMessage());
         }
     }
     
@@ -993,12 +1217,12 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private void toggleHomePageAppointments() {
         showUpcomingOnHome = !showUpcomingOnHome;
         updateHomePageAppointments();
-        logger.info("Toggled to show " + (showUpcomingOnHome ? "upcoming" : "past") + " appointments");
+        logger.log(TAG, "Toggled to show " + (showUpcomingOnHome ? "upcoming" : "past") + " appointments");
     }
     
     /**
      * Initializes feature checkboxes with real feature names and listeners.
-     * Only shows Reminders and PatientView. Hides Email, AdvancedSearch, and Fast.
+     * Only shows Reminders. Hides Email, AdvancedSearch, and Fast.
      */
     private void initializeFeatureCheckboxes() {
         java.util.List<javax.swing.JCheckBox> checkboxes = Arrays.asList(
@@ -1046,7 +1270,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         try {
             if (activate) {
                 featureManager.activateFeatures(feature);
-                logger.info("Feature activated: " + feature);
+                logger.log(TAG, "Feature activated: " + feature);
                 
                 // Special handling for Reminders
                 if ("Reminders".equals(feature)) {
@@ -1054,17 +1278,15 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 }
             } else {
                 featureManager.deactivateFeatures(feature);
-                logger.info("Feature deactivated: " + feature);
-                
-                // Special handling for Reminders
+                logger.log(TAG, "Feature deactivated: " + feature);
+
                 if ("Reminders".equals(feature)) {
                     hideReminderNotifications();
                 }
             }
         } catch (IllegalStateException e) {
-            // Cannot deactivate mandatory feature
-            logger.warning("Cannot deactivate mandatory feature: " + feature);
-            checkbox.setSelected(true); // Revert checkbox
+            logger.log(TAG, "[WARN] Cannot deactivate mandatory feature: " + feature);
+            checkbox.setSelected(true); 
             javax.swing.JOptionPane.showMessageDialog(this, 
                 "Cannot deactivate mandatory feature: " + feature);
         }
@@ -1087,7 +1309,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         if (choice == 0) {
             // In App reminders
             featureManager.setFeatureAttribute("Reminders", "type", "InApp");
-            logger.info("Reminders set to: In App");
+            logger.log(TAG, "Reminders set to: In App");
         } else if (choice == 1) {
             // Email reminders - ask for email
             String email = javax.swing.JOptionPane.showInputDialog(this,
@@ -1099,7 +1321,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 if (isValidEmail(email)) {
                     featureManager.setFeatureAttribute("Reminders", "type", "Email");
                     featureManager.setFeatureAttribute("Reminders", "email", email);
-                    logger.info("Reminders set to: Email (" + email + ")");
+                    logger.log(TAG, "Reminders set to: Email (" + email + ")");
                 } else {
                     javax.swing.JOptionPane.showMessageDialog(this,
                         "Invalid email format. Please enter a valid email.",
@@ -1127,22 +1349,22 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
     private void consultationTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_consultationTypeActionPerformed
         String selected = (String) consultationType.getSelectedItem();
-        logger.info("Consultation type selected: " + selected);
+        logger.log(TAG, "Consultation type selected: " + selected);
     }//GEN-LAST:event_consultationTypeActionPerformed
 
     private void locationActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_locationActionPerformed
         String selected = (String) location.getSelectedItem();
-        logger.info("Location selected: " + selected);
+        logger.log(TAG, "Location selected: " + selected);
     }//GEN-LAST:event_locationActionPerformed
 
     private void personnelActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_personnelActionPerformed
         String selected = (String) personnel.getSelectedItem();
-        logger.info("Personnel selected: " + selected);
+        logger.log(TAG, "Personnel selected: " + selected);
     }//GEN-LAST:event_personnelActionPerformed
 
     private void roomTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_roomTypeActionPerformed
         String selected = (String) roomType.getSelectedItem();
-        logger.info("Room type selected: " + selected);
+        logger.log(TAG, "Room type selected: " + selected);
     }//GEN-LAST:event_roomTypeActionPerformed
 
     private void bookBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_bookBtnActionPerformed
@@ -1180,7 +1402,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 javax.swing.JOptionPane.showMessageDialog(this, 
                     "Appointment updated successfully!\n" + dateStr + " at " + timeStr + " with " + doctor);
                 
-                logger.info("Appointment updated: " + dateStr + " at " + timeStr + " with " + doctor);
+                logger.log(TAG, "Appointment updated: " + dateStr + " at " + timeStr + " with " + doctor);
                 
                 // Reset the modify flag
                 appointmentBeingModified = null;
@@ -1196,10 +1418,14 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 );
                 
                 appointmentManager.addAppointment(newAppointment);
+                
+                // Schedule reminder for new appointment (24 hours before)
+                appointmentNotificationManager.scheduleAppointmentReminder(newAppointment, 24);
+                
                 javax.swing.JOptionPane.showMessageDialog(this, 
                     "Appointment booked successfully!\n" + dateStr + " at " + timeStr + " with " + doctor);
                 
-                logger.info("Appointment booked: " + dateStr + " at " + timeStr + " with " + doctor);
+                logger.log(TAG, "Appointment booked: " + dateStr + " at " + timeStr + " with " + doctor);
             }
             
             // Auto-return to appointments view after successful booking/update
@@ -1209,13 +1435,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             
         } catch (Exception e) {
             javax.swing.JOptionPane.showMessageDialog(this, "Error booking appointment: " + e.getMessage());
-            logger.severe("Error booking appointment: " + e.getMessage());
+            logger.logError(TAG, "Error booking appointment: " + e.getMessage());
         }
     }//GEN-LAST:event_bookBtnActionPerformed
 
     private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
         javax.swing.JOptionPane.showMessageDialog(this, "Attestation request submitted.");
-        logger.info("Attestation request submitted");
+        logger.log(TAG, "Attestation request submitted");
     }//GEN-LAST:event_jButton6ActionPerformed
 
     private void newBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newBtnActionPerformed
@@ -1236,7 +1462,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         // Show the book panel using CardLayout
         java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
         cl.show(appointmentsTab, "card3");  // card3 is the bookPanel card
-        logger.info("New appointment form opened");
+        logger.log(TAG, "New appointment form opened");
     }//GEN-LAST:event_newBtnActionPerformed
 
     private void modifyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_modifyBtnActionPerformed
@@ -1290,9 +1516,9 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                     "Modify the appointment details and click 'Update Appointment' to save changes.",
                     "Modify Appointment",
                     javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                logger.info("Loaded appointment for modification: " + selected.getDate());
+                logger.log(TAG, "Loaded appointment for modification: " + selected.getDate());
             } catch (Exception e) {
-                logger.severe("Error loading appointment for modification: " + e.getMessage());
+                logger.logError(TAG, "Error loading appointment for modification: " + e.getMessage());
                 javax.swing.JOptionPane.showMessageDialog(this, 
                     "Error loading appointment: " + e.getMessage());
             }
@@ -1305,12 +1531,29 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         int selectedRow = appointmentsTable.getSelectedRow();
         if (selectedRow >= 0) {
             Appointment selected = appointmentModel.getAppointmentAt(selectedRow);
-            int option = javax.swing.JOptionPane.showConfirmDialog(this, 
-                "Cancel appointment: " + selected.getDate() + " with " + selected.getDoctor() + "?");
-            if (option == javax.swing.JOptionPane.YES_OPTION) {
+            
+            // Ask for cancellation reason
+            String[] options = {"Patient Request", "Doctor Unavailable", "Other"};
+            int choice = javax.swing.JOptionPane.showOptionDialog(this,
+                "Reason for cancellation:",
+                "Cancel Appointment",
+                javax.swing.JOptionPane.YES_NO_CANCEL_OPTION,
+                javax.swing.JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]);
+            
+            if (choice >= 0) {
+                String cancelledBy = choice == 1 ? "Doctor" : "Patient";
+                String reason = options[choice];
+                
                 appointmentManager.cancelAppointment(selected);
+                
+                // Send cancellation notification
+                appointmentNotificationManager.sendCancellationNotice(selected, cancelledBy, reason);
+                
                 javax.swing.JOptionPane.showMessageDialog(this, "Appointment cancelled successfully.");
-                logger.info("Appointment cancelled");
+                logger.log(TAG, "Appointment cancelled by " + cancelledBy);
             }
         } else {
             javax.swing.JOptionPane.showMessageDialog(this, "Please select an appointment to cancel.");
@@ -1322,7 +1565,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         if (selectedIndex >= 0) {
             String selected = timePeriodList.getModel().getElementAt(selectedIndex);
             applyDateFilter(selected);
-            logger.info("Filter applied: " + selected);
+            logger.log(TAG, "Filter applied: " + selected);
         }
     }//GEN-LAST:event_applyFilterBtnActionPerformed
     
@@ -1332,15 +1575,15 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private void applyDateFilter(String filterType) {
         try {
             java.util.List<Appointment> allAppointments = appointmentManager.getAllAppointments();
-            java.time.LocalDate now = java.time.LocalDate.now();
-            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
+            Date now = timeEventManager.getDate();
             
             // Rebuild model with all appointments first
             appointmentModel = new AppointmentTableModel();
             
             for (Appointment apt : allAppointments) {
                 try {
-                    java.time.LocalDate aptDate = java.time.LocalDate.parse(apt.getDate(), formatter);
+                    Date aptDate = apt.getDateAsDate();
+                    
                     boolean include = false;
                     
                     switch (filterType) {
@@ -1348,13 +1591,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                             include = aptDate.equals(now);
                             break;
                         case "This Week":
-                            include = !aptDate.isBefore(now) && !aptDate.isAfter(now.plusDays(7));
+                            include = !aptDate.before(now) && !aptDate.after(new Date(now.getTime() + 7L * 24 * 60 * 60 * 1000));
                             break;
                         case "All Upcoming":
-                            include = !aptDate.isBefore(now);
+                            include = !aptDate.before(now);
                             break;
                         case "Past Appointments":
-                            include = aptDate.isBefore(now);
+                            include = aptDate.before(now);
                             break;
                     }
                     
@@ -1368,7 +1611,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             
             appointmentsTable.setModel(appointmentModel);
         } catch (Exception e) {
-            logger.severe("Error applying filter: " + e.getMessage());
+            logger.logError(TAG, "Error applying filter: " + e.getMessage());
         }
     }
 
@@ -1376,41 +1619,41 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         // Show the appointments view panel using CardLayout
         java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
         cl.show(appointmentsTab, "card6");  // card6 is the appointmentsView card
-        logger.info("New appointment form cancelled");
+        logger.log(TAG, "New appointment form cancelled");
     }//GEN-LAST:event_cancelBtnActionPerformed
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
         javax.swing.JOptionPane.showMessageDialog(this, "Opening billing modification panel...");
-        logger.info("Billing modification opened");
+        logger.log(TAG, "Billing modification opened");
     }//GEN-LAST:event_jButton7ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         // Navigate to Appointments tab
         mainTabs.setSelectedIndex(1); // 1 = Appointments tab
-        logger.info("Navigated to Appointments tab from home page");
+        logger.log(TAG, "Navigated to Appointments tab from home page");
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         // Navigate to Appointments tab
         mainTabs.setSelectedIndex(1); // 1 = Appointments tab
-        logger.info("Navigated to Appointments tab from home page");
+        logger.log(TAG, "Navigated to Appointments tab from home page");
     }//GEN-LAST:event_jButton2ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
         // Navigate to Appointments tab
         mainTabs.setSelectedIndex(1); // 1 = Appointments tab
-        logger.info("Navigated to Appointments tab from home page");
+        logger.log(TAG, "Navigated to Appointments tab from home page");
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
         String selected = (String) jComboBox1.getSelectedItem();
-        logger.info("Theme selected: " + selected);
+        logger.log(TAG, "Theme selected: " + selected);
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
     private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
         String optionName = jTextField1.getText();
         String category = (String) jComboBox6.getSelectedItem();
-        logger.info("Adding option: " + optionName + " to category: " + category);
+        logger.log(TAG, "Adding option: " + optionName + " to category: " + category);
     }//GEN-LAST:event_jTextField1ActionPerformed
 
     /**
@@ -1422,16 +1665,19 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
          * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
          */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
-            logger.log(java.util.logging.Level.SEVERE, null, ex);
-        }
+        FlatLightLaf.setup();
+
+//        try {
+//            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+//                logger.log(TAG, "Available Look and Feel: " + info.getName());
+//                if ("Metal".equals(info.getName())) {
+//                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+//                    //break;
+//                }
+//            }
+//        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
+//            logger.logError(TAG, "UI look and feel setup failed: " + ex.getMessage());
+//        }
         //</editor-fold>
 
         /* Create and display the form */
@@ -1441,59 +1687,72 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     // ============ OBSERVER PATTERN IMPLEMENTATIONS ============
     
     @Override
-    public void onFeaturesActivated(java.util.List<String> features) {
-        for (String feature : features) {
-            logger.info("Feature activated in UI: " + feature);
-            // TODO: Update UI based on activated feature
-        }
+    public void onFeaturesActivated(List<String> features) {
+        refreshFeatureUI();
     }
     
     @Override
-    public void onFeaturesDeactivated(java.util.List<String> features) {
-        for (String feature : features) {
-            logger.info("Feature deactivated in UI: " + feature);
-            // TODO: Update UI based on deactivated feature
-        }
+    public void onFeaturesDeactivated(List<String> features) {
+        refreshFeatureUI();
     }
     
     @Override
     public void onInsuranceLevelChanged(FeatureManager.InsuranceLevel level) {
-        logger.info("Insurance level changed to: " + level);
+        logger.log(TAG, "Insurance level changed to: " + level);
         updateProfileDisplay();
         // TODO: Update available appointment options based on insurance
     }
     
     @Override
     public void onPatientChanged(PatientManager.Patient patient) {
-        logger.info("Patient changed");
+        logger.log(TAG, "Patient changed");
         updateProfileDisplay();
     }
     
     @Override
     public void onPatientUpdated(PatientManager.Patient patient) {
-        logger.info("Patient information updated");
+        logger.log(TAG, "Patient information updated");
         updateProfileDisplay();
     }
     
     @Override
     public void onAppointmentAdded(Appointment appointment) {
-        logger.info("Appointment added: " + appointment.getDate());
+        logger.log(TAG, "Appointment added: " + appointment.getDate());
         appointmentModel.addAppointment(appointment);
         updateHomePageAppointments();
     }
     
     @Override
     public void onAppointmentRemoved(Appointment appointment) {
-        logger.info("Appointment removed");
+        logger.log(TAG, "Appointment removed");
         appointmentModel.removeAppointment(appointmentModel.getFilteredAppointmentCount() - 1);
         updateHomePageAppointments();
     }
     
     @Override
     public void onAppointmentUpdated(Appointment appointment) {
-        logger.info("Appointment updated");
+        logger.log(TAG, "Appointment updated");
         appointmentModel.applyFilter(appointmentModel.getFilteredAppointmentCount() > 0 ? "" : "");
         updateHomePageAppointments();
+    }
+
+    /**
+     * Implement NotificationListener to receive notifications in UI.
+     */
+    // TODO fix notification usage so the system is used properly instead of just adding to groupbox
+    @Override
+    public void onNotification(Notification notification) {
+        // Add to notification list in UI
+        String displayText = notification.getTitle() + ": " + notification.getMessage();
+        notificationListModel.addElement(displayText);
+        logger.log(TAG, "Notification received in UI: " + notification.getTitle());
+
+        if (notification.getTitle().contains("Cancelled") || notification.getTitle().contains("Unavailable")) {
+            javax.swing.JOptionPane.showMessageDialog(this, 
+                notification.getMessage(), 
+                notification.getTitle(), 
+                javax.swing.JOptionPane.WARNING_MESSAGE);
+        }
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables

@@ -1,6 +1,8 @@
 package com.mycompany.model;
 
-import com.mycompany.ui.model.Appointment;
+import com.mycompany.data.Appointment;
+
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -10,6 +12,7 @@ import java.util.*;
  */
 public class AppointmentManager {
     private static AppointmentManager instance;
+    private final TimeEventManager timeEventManager = TimeEventManager.getInstance();
     
     private final List<Appointment> allAppointments;
     private final List<AppointmentObserver> observers;
@@ -109,66 +112,51 @@ public class AppointmentManager {
     }
     
     /**
-     * Gets upcoming appointments using current system date.
-     * Filters appointments that are scheduled and occur on or after today.
+     * Gets upcoming appointments using time-event "now".
+     * Filters appointments that are scheduled and occur on or after now.
      */
     public List<Appointment> getUpcomingAppointments() {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
-        
+        final java.util.Date now = timeEventManager.getDate();
+
         return allAppointments.stream()
             .filter(a -> a.getStatus().equalsIgnoreCase("Scheduled"))
             .filter(a -> {
-                try {
-                    java.time.LocalDateTime aptDateTime = java.time.LocalDateTime.parse(a.getDate() + " " + a.getTime(), formatter);
-                    return !aptDateTime.isBefore(now); // Now or later
-                } catch (Exception e) {
-                    return false;
-                }
+                Date apt = a.getDateAsDate();
+                return apt != null && !apt.before(now);
             })
             .sorted((a, b) -> {
-                try {
-                    java.time.LocalDateTime dateA = java.time.LocalDateTime.parse(a.getDate() + " " + a.getTime(), formatter);
-                    java.time.LocalDateTime dateB = java.time.LocalDateTime.parse(b.getDate() + " " + b.getTime(), formatter);
-                    return dateA.compareTo(dateB);
-                } catch (Exception e) {
-                    return 0;
-                }
+                Date da = a.getDateAsDate();
+                Date db = b.getDateAsDate();
+                if (da == null && db == null) return 0;
+                if (da == null) return 1;
+                if (db == null) return -1;
+                return da.compareTo(db);
             })
             .toList();
     }
     
     /**
-     * Gets past appointments using current system date.
-     * Filters appointments that are completed or scheduled before today.
+     * Gets past appointments using time-event "now".
+     * Filters appointments that are completed or scheduled before now.
      */
     public List<Appointment> getPastAppointments() {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
-        
+        final java.util.Date now = timeEventManager.getDate();
+
         return allAppointments.stream()
             .filter(a -> {
-                try {
-                    if (a.getStatus().equalsIgnoreCase("Completed")) {
-                        return true;
-                    }
-                    if (a.getStatus().equalsIgnoreCase("Scheduled")) {
-                        java.time.LocalDateTime aptDateTime = java.time.LocalDateTime.parse(a.getDate() + " " + a.getTime(), formatter);
-                        return aptDateTime.isBefore(now);
-                    }
-                    return false;
-                } catch (Exception e) {
-                    return false;
-                }
+                if (a.getStatus().equalsIgnoreCase("Completed")) return true;
+                if (!a.getStatus().equalsIgnoreCase("Scheduled")) return false;
+
+                Date apt = a.getDateAsDate();
+                return apt != null && apt.before(now);
             })
             .sorted((a, b) -> {
-                try {
-                    java.time.LocalDateTime dateA = java.time.LocalDateTime.parse(a.getDate() + " " + a.getTime(), formatter);
-                    java.time.LocalDateTime dateB = java.time.LocalDateTime.parse(b.getDate() + " " + b.getTime(), formatter);
-                    return dateB.compareTo(dateA); // Reverse order (most recent first)
-                } catch (Exception e) {
-                    return 0;
-                }
+                Date da = a.getDateAsDate();
+                Date db = b.getDateAsDate();
+                if (da == null && db == null) return 0;
+                if (da == null) return 1;
+                if (db == null) return -1;
+                return db.compareTo(da); // most recent first
             })
             .toList();
     }
@@ -176,10 +164,9 @@ public class AppointmentManager {
     /**
      * Cancels an appointment by changing its status.
      */
-    public synchronized boolean cancelAppointment(Appointment appointment) {
+    public synchronized void cancelAppointment(Appointment appointment) {
         appointment.setStatus("Cancelled");
         updateAppointment(appointment);
-        return true;
     }
     
     /**
@@ -245,4 +232,5 @@ public class AppointmentManager {
         }
         return null;
     }
+
 }

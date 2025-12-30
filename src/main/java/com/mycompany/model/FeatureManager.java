@@ -1,6 +1,9 @@
 package com.mycompany.model;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * Singleton manager for feature activation/deactivation.
@@ -8,52 +11,54 @@ import java.util.*;
  * Core component for dynamic, adaptive system behavior.
  */
 public class FeatureManager {
+    public enum InsuranceLevel {
+        MINIMAL, NORMAL, PREMIUM
+    }
+
+    public enum NotificationMethod {
+        IN_APP, EMAIL, SMS
+    }
+
     private static FeatureManager instance;
-    
-    // Feature names from feature diagram
+
     private final Set<String> activeFeatures;
     private final List<FeatureObserver> observers;
     private final Map<String, Map<String, Object>> featureAttributes; // Store feature-specific attributes
-    
-    // Insurance level (affects feature availability)
+
     private InsuranceLevel insuranceLevel;
     
     // Available features as per feature diagram
     private static final Set<String> VALID_FEATURES = Set.of(
         // Appointment Features
-        "Book", "Modify", "Cancel", "Complete",
-        "Doctor", "Nurse",
-        "HospitalOrCenter", "RoomType", "SharedRoom", "PrivateRoom",
-        "ImagingEquipment", "SurgeryEquipment", "DentalEquipment",
-        "Price", "Prepay", "DelayedPayment", "Card", "Cash", "InsuranceBilling",
+        "Book", "Modify", "Cancel", "Complete", "Personel",
+        "ConsultationType", "ConsultationLocation", "RoomType", "SharedRoom", "PrivateRoom",
+        "Prepay", "DelayedPayment", "Card", "Cash", "InsuranceBilling",
         
         // Medical History Features
         "PastConsultations", "Prescriptions",
-        "Sort", "SortByDate", "SortByType", "SortByService",
+        "Sort", "SortByDate", "SortByType", "SortByService", "SearchByStaff",
         "BasicSearch", "AdvancedSearch",
         
         // Adaptation Features
         "Reminders", "AppointmentReminders", "MedicationReminders", "OtherReminders",
         "Fast", "AutoDoctor", "AutoTimeslot",
         "AutoReschedule", "NotifyOnReschedule",
-        "PatientView", "DoctorView", "NurseView", "AdminView",
-        "InApp", "Email", "Sms",
+        "Notification",
+        "DarkMode",
         
         // User Profile
-        "ContactMethod", "CurrentMedication", "Vaccines",
-        
-        // Event Simulator
-        "DoctorUnavailableEvent", "UserIllEvent", "AppointmentCompletedEvent"
+        "ContactMethod", "CurrentMedication", "Vaccines"
     );
-    
-    public enum InsuranceLevel {
-        MINIMAL, NORMAL, PREMIUM
-    }
+
+    private static final Set<String> MANDATORY_FEATURES = Set.of(
+        "Book", "Cancel", "Complete", "PastConsultations", "Personel",
+            "ConsultationType", "ConsultationLocation", "RoomType", "SharedRoom", "PrivateRoom"
+    );
     
     private FeatureManager() {
         this.activeFeatures = new HashSet<>();
-        this.observers = new ArrayList<>();
-        this.featureAttributes = new HashMap<>();
+        this.observers = new CopyOnWriteArrayList<>();
+        this.featureAttributes = new ConcurrentHashMap<>();
         this.insuranceLevel = InsuranceLevel.NORMAL;
         
         // Initialize default active features (mandatory ones)
@@ -74,10 +79,7 @@ public class FeatureManager {
      * Initialize mandatory features that are always active.
      */
     private void initializeDefaultFeatures() {
-        // Mandatory appointment features
-        activeFeatures.add("Book");
-        activeFeatures.add("Cancel");
-        activeFeatures.add("Complete");
+        activeFeatures.addAll(new ArrayList<>(MANDATORY_FEATURES));
         
         // Mandatory medical history
         activeFeatures.add("PastConsultations");
@@ -85,7 +87,6 @@ public class FeatureManager {
         // Default optional features
         activeFeatures.add("BasicSearch");
         activeFeatures.add("Reminders");
-        activeFeatures.add("PatientView");
     }
     
     /**
@@ -155,7 +156,7 @@ public class FeatureManager {
     /**
      * Checks if a feature is mandatory (cannot be deactivated).
      */
-    private boolean isMandatory(String feature) {
+    public boolean isMandatory(String feature) {
         return Set.of("Book", "Cancel", "Complete", "PastConsultations").contains(feature);
     }
     
@@ -185,12 +186,18 @@ public class FeatureManager {
         return available;
     }
     
+    private void forEachObserver(Consumer<FeatureObserver> action) {
+        for (FeatureObserver observer : observers) {
+            action.accept(observer);
+        }
+    }
+
     /**
      * Registers an observer for feature changes.
      */
     public void registerObserver(FeatureObserver observer) {
-        if (!observers.contains(observer)) {
-            observers.add(observer);
+        if (observer != null) {
+            ((CopyOnWriteArrayList<FeatureObserver>) observers).addIfAbsent(observer);
         }
     }
     
@@ -205,34 +212,32 @@ public class FeatureManager {
      * Notifies observers of feature activation.
      */
     private void notifyObserversFeatureActivated(List<String> features) {
-        for (FeatureObserver observer : observers) {
-            observer.onFeaturesActivated(features);
-        }
+        forEachObserver(o -> o.onFeaturesActivated(features));
     }
     
     /**
      * Notifies observers of feature deactivation.
      */
     private void notifyObserversFeatureDeactivated(List<String> features) {
-        for (FeatureObserver observer : observers) {
-            observer.onFeaturesDeactivated(features);
-        }
+        forEachObserver(o -> o.onFeaturesDeactivated(features));
     }
     
     /**
      * Notifies observers of insurance level change.
      */
     private void notifyObserversInsuranceLevelChanged(InsuranceLevel level) {
-        for (FeatureObserver observer : observers) {
-            observer.onInsuranceLevelChanged(level);
-        }
+        forEachObserver(o -> o.onInsuranceLevelChanged(level));
     }
     
     /**
      * Sets an attribute for a feature (e.g., reminder type, email address).
      */
     public void setFeatureAttribute(String featureName, String attributeName, Object attributeValue) {
-        featureAttributes.computeIfAbsent(featureName, k -> new HashMap<>())
+        if (!VALID_FEATURES.contains(featureName)) {
+            throw new IllegalArgumentException("Unknown feature: " + featureName);
+        }
+        featureAttributes
+            .computeIfAbsent(featureName, k -> new ConcurrentHashMap<>())
             .put(attributeName, attributeValue);
     }
     
@@ -240,13 +245,21 @@ public class FeatureManager {
      * Gets an attribute for a feature.
      */
     public Object getFeatureAttribute(String featureName, String attributeName) {
-        return featureAttributes.getOrDefault(featureName, new HashMap<>()).get(attributeName);
+        if (!VALID_FEATURES.contains(featureName)) {
+            throw new IllegalArgumentException("Unknown feature: " + featureName);
+        }
+        Map<String, Object> attrs = featureAttributes.get(featureName);
+        return (attrs == null) ? null : attrs.get(attributeName);
     }
     
     /**
      * Gets all attributes for a feature.
      */
     public Map<String, Object> getFeatureAttributes(String featureName) {
-        return featureAttributes.getOrDefault(featureName, new HashMap<>());
+        if (!VALID_FEATURES.contains(featureName)) {
+            throw new IllegalArgumentException("Unknown feature: " + featureName);
+        }
+        Map<String, Object> attrs = featureAttributes.get(featureName);
+        return (attrs == null) ? Collections.emptyMap() : Map.copyOf(attrs);
     }
 }

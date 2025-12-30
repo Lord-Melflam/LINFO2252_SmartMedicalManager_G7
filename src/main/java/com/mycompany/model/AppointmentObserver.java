@@ -1,6 +1,6 @@
 package com.mycompany.model;
 
-import com.mycompany.ui.model.Appointment;
+import com.mycompany.data.Appointment;
 
 /**
  * Observer interface for appointment changes.

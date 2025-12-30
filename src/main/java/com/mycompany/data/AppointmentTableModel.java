@@ -1,4 +1,4 @@
-package com.mycompany.ui.model;
+package com.mycompany.data;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
@@ -114,6 +114,9 @@ public class AppointmentTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
+        if (filteredAppointments.size() <= rowIndex) {
+            return null;
+        }
         Appointment appointment = filteredAppointments.get(rowIndex);
         return switch (columnIndex) {
             case 0 -> appointment.getDate();

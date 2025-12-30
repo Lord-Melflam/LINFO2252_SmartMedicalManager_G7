@@ -943,6 +943,11 @@
                         <Property name="text" type="java.lang.String" value="jCheckBox3"/>
                       </Properties>
                     </Component>
+                    <Component class="javax.swing.JCheckBox" name="jCheckBox2">
+                      <Properties>
+                        <Property name="text" type="java.lang.String" value="jCheckBox2"/>
+                      </Properties>
+                    </Component>
                   </SubComponents>
                 </Container>
               </SubComponents>
@@ -1073,11 +1078,13 @@
                               <Component id="jButton4" min="-2" pref="96" max="-2" attributes="0"/>
                               <EmptySpace type="separate" max="-2" attributes="0"/>
                               <Component id="jTextField1" min="-2" pref="149" max="-2" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="jRadioButton1" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Component id="jLabel19" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Component id="jCalendar1" alignment="0" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="371" max="32767" attributes="0"/>
+                      <EmptySpace pref="267" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1089,6 +1096,7 @@
                           <Component id="jTextField1" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jButton4" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jComboBox6" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="jRadioButton1" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="jLabel19" min="-2" max="-2" attributes="0"/>
@@ -1138,6 +1146,11 @@
               </Properties>
             </Component>
             <Component class="com.toedter.calendar.JCalendar" name="jCalendar1">
+            </Component>
+            <Component class="javax.swing.JRadioButton" name="jRadioButton1">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="jRadioButton1"/>
+              </Properties>
             </Component>
           </SubComponents>
         </Container>
