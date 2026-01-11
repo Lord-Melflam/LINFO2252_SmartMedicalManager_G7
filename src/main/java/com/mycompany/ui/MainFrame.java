@@ -49,6 +49,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private boolean showUpcomingOnHome = true; // Toggle for home page appointments
     private Appointment appointmentBeingModified = null; // Track which appointment is being edited
     private AppointmentNotificationManager appointmentNotificationManager;
+    private MedicationManager medicationManager;
     private boolean homeReminderListListenerInstalled = false;
     private NotificationManager notificationManager;
     private TimeEventManager timeEventManager;
@@ -86,7 +87,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         patientManager.registerObserver(this);
         notificationManager.registerObserver(this);
         
-        appointmentNotificationManager = new AppointmentNotificationManager(notificationManager, timeEventManager);
+        appointmentNotificationManager = AppointmentNotificationManager.getInstance();
+        medicationManager = MedicationManager.getInstance();
         
         initializeUI();
         logger.log(TAG, "MainFrame constructed and UI initialized.");
@@ -171,6 +173,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             updateSortingByFeatures();
             updateBookingDropdownsByFeatures();
             updateSearchByFeatures();
+            updateProfileDisplay();
+            updateHomePageAppointments();
         });
     }
 
@@ -272,7 +276,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     }
 
     private void updateSearchByFeatures() {
-        boolean searchEnabled = featureManager.isFeatureActive("BasicSearch") || featureManager.isFeatureActive("AdvancedSearch");
+        boolean searchEnabled = featureManager.isFeatureActive("Search");
         searchBar.setEnabled(searchEnabled);
         // disable filter too
         applyFilterBtn.setEnabled(searchEnabled);
@@ -1086,7 +1090,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     
     /**
      * Updates profile display with current patient information.
-     * Gets data from PatientManager instead of hardcoded placeholders.
+        * Patient identity comes from PatientManager; medication/vaccines are sourced from MedicationManager.
      */
     private void updateProfileDisplay() {
         PatientManager.Patient patient = patientManager.getCurrentPatient();
@@ -1095,8 +1099,32 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         jLabel14.setText("Sex : " + patient.getSex());
         jLabel15.setText("Age : " + patient.getAge());
         jLabel16.setText("Insurance : " + patient.getInsuranceLevel());
-        jTextArea1.setText("Current Medication: " + patient.getCurrentMedication() + "\n" +
-                          "Vaccines: " + patient.getVaccines());
+
+        boolean showMedication = featureManager != null && featureManager.isFeatureActive("CurrentMedication");
+        boolean showVaccines = featureManager != null && featureManager.isFeatureActive("Vaccines");
+
+        StringBuilder details = new StringBuilder();
+
+        if (medicationManager == null) {
+            medicationManager = MedicationManager.getInstance();
+        }
+
+        if (showMedication) {
+            details.append(medicationManager.formatMedicationSection());
+        }
+
+        if (showVaccines) {
+            if (details.length() > 0) {
+                details.append("\n");
+            }
+            details.append(medicationManager.formatVaccinesSection());
+        }
+
+        if (details.length() == 0) {
+            details.append("No medical details available.");
+        }
+
+        jTextArea1.setText(details.toString());
     }
     
     /**
@@ -1209,48 +1237,55 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             return;
         }
 
-        addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.HEADER,
-                "Reminders (double-click to open appointment)", null, null));
+        boolean remindersEnabled = featureManager != null && featureManager.isFeatureActive("Reminders");
+        boolean notificationsEnabled = featureManager != null && featureManager.isFeatureActive("Notification");
 
-        java.util.List<Appointment> reminders = java.util.Collections.emptyList();
-        try {
-            if (appointmentNotificationManager != null) {
-                reminders = appointmentNotificationManager.getUpcomingReminderAppointments(10);
+        if (remindersEnabled) {
+            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.HEADER,
+                    "Reminders (double-click to open appointment)", null, null));
+
+            java.util.List<Appointment> reminders = java.util.Collections.emptyList();
+            try {
+                if (appointmentNotificationManager != null) {
+                    reminders = appointmentNotificationManager.getUpcomingReminderAppointments(10);
+                }
+            } catch (Exception ignored) {
+                reminders = java.util.Collections.emptyList();
             }
-        } catch (Exception ignored) {
-            reminders = java.util.Collections.emptyList();
+
+            reminders.sort(java.util.Comparator.comparing(a -> {
+                java.util.Date d = a.getDateAsDate();
+                return (d == null) ? new java.util.Date(Long.MAX_VALUE) : d;
+            }));
+
+            if (reminders.isEmpty()) {
+                addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, "(no scheduled reminders)", null, null));
+            } else {
+                for (Appointment apt : reminders) {
+                    String display = "REMINDER: " + apt.getDoctor() + " — " + apt.getDate() + " " + apt.getTime();
+                    addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.REMINDER, display, apt, null));
+                }
+            }
+
+            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, " ", null, null));
         }
 
-        reminders.sort(java.util.Comparator.comparing(a -> {
-            java.util.Date d = a.getDateAsDate();
-            return (d == null) ? new java.util.Date(Long.MAX_VALUE) : d;
-        }));
+        if (notificationsEnabled) {
+            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.HEADER,
+                    "Notifications (double-click to view)", null, null));
 
-        if (reminders.isEmpty()) {
-            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, "(no scheduled reminders)", null, null));
-        } else {
-            for (Appointment apt : reminders) {
-                String display = "REMINDER: " + apt.getDoctor() + " — " + apt.getDate() + " " + apt.getTime();
-                addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.REMINDER, display, apt, null));
-            }
-        }
-
-        addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, " ", null, null));
-
-        addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.HEADER,
-                "Notifications (double-click to view)", null, null));
-
-        if (homeNotifications.isEmpty()) {
-            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, "(no notifications yet)", null, null));
-        } else {
-            int count = 0;
-            for (Notification n : homeNotifications) {
-                if (n == null) continue;
-                if (count >= HOME_MAX_NOTIFICATIONS) break;
-                count++;
-                String ts = (timeEventManager == null) ? "" : timeEventManager.formatMillis(n.getTimestamp());
-                String display = "[" + ts + "] " + n.getTitle();
-                addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.NOTIFICATION, display, null, n));
+            if (homeNotifications.isEmpty()) {
+                addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, "(no notifications yet)", null, null));
+            } else {
+                int count = 0;
+                for (Notification n : homeNotifications) {
+                    if (n == null) continue;
+                    if (count >= HOME_MAX_NOTIFICATIONS) break;
+                    count++;
+                    String ts = (timeEventManager == null) ? "" : timeEventManager.formatMillis(n.getTimestamp());
+                    String display = "[" + ts + "] " + n.getTitle();
+                    addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.NOTIFICATION, display, null, n));
+                }
             }
         }
     }
@@ -1525,6 +1560,16 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
             // If appointment is cancelled, confirm rescheduling
             if ("Cancelled".equalsIgnoreCase(selected.getStatus())) {
+                if (featureManager != null && !featureManager.isFeatureActive("Re-scheduling")) {
+                    javax.swing.JOptionPane.showMessageDialog(
+                        this,
+                        "Re-scheduling is disabled by admin configuration.",
+                        "Cannot reschedule",
+                        javax.swing.JOptionPane.WARNING_MESSAGE
+                    );
+                    return;
+                }
+
                 int choice = javax.swing.JOptionPane.showConfirmDialog(this,
                     "This appointment is cancelled. Do you want to reschedule it?",
                     "Reschedule cancelled appointment",
@@ -1626,8 +1671,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                     return;
                 }
                 
-                // Send cancellation notification
-                appointmentNotificationManager.sendCancellationNotice(selected, cancelledBy, reason);
+                // Route cancellation through the simulated TimeEvent system
+                appointmentNotificationManager.scheduleCancellationNotice(selected, cancelledBy, reason, timeEventManager.getDate());
                 
                 javax.swing.JOptionPane.showMessageDialog(this, "Appointment cancelled successfully.");
                 logger.log(TAG, "Appointment cancelled by " + cancelledBy);
@@ -1795,6 +1840,14 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     public void onNotification(Notification notification) {
         if (notification == null) {
             return;
+        }
+
+        try {
+            if (featureManager != null && !featureManager.isFeatureActive("Notification")) {
+                return;
+            }
+        } catch (Exception ignored) {
+            // If feature lookup fails, keep UI resilient and still display.
         }
 
         logger.log(TAG, "Notification received in UI: " + notification.getTitle());

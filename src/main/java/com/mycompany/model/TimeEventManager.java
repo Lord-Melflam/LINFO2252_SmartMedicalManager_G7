@@ -151,6 +151,22 @@ public class TimeEventManager {
         processDueEvents();
     }
 
+    /**
+     * Best-effort cancellation of a scheduled (not-yet-fired) event.
+     * Returns true if an event was removed from the queue.
+     */
+    public synchronized boolean cancelScheduledEvent(String eventId) {
+        if (eventId == null || eventId.isBlank()) {
+            return false;
+        }
+
+        boolean removed = queue.removeIf(e -> e != null && eventId.equals(e.getId()));
+        if (removed) {
+            logger.log("TimeEventManager", "Cancelled scheduled event '" + eventId + "'");
+        }
+        return removed;
+    }
+
     public synchronized void registerListener(TimeEventObserver listener) {
         listeners.add(listener);
         logger.log("TimeEventManager", "Listener registered.");

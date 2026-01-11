@@ -31,29 +31,36 @@ public class FeatureManager {
 
     private static final Set<String> VALID_FEATURES = Set.of(
         // Appointment Features
-        "Book", "Modify", "Cancel", "Complete", "Personel",
-        "ConsultationType", "ConsultationLocation", "RoomType",
+        "Book", "Modify", "Cancel", "Re-scheduling",
+        "Personel", "ConsultationType", "ConsultationLocation", "RoomType",
         "InsuranceBilling",
         
         // Medical History Features
         "PastConsultations",
-        "Sort", "SortByDate", "SortByType", "SortByService", "SearchByStaff",
-        "BasicSearch", "AdvancedSearch",
+        "Sort", "SortByDate", "SortByType", "SortByService",
+        "Search",
         
         // Adaptation Features
         "Reminders", "AppointmentReminders", "MedicationReminders", "OtherReminders",
-        "Fast", "AutoDoctor", "AutoTimeslot",
-        "AutoReschedule", "NotifyOnReschedule",
-        "Notification",
+        "Notification", "NotifyOnReschedule",
         "DarkMode",
         
         // User Profile
-        "ContactMethod", "CurrentMedication", "Vaccines"
+        "BillingInformation", "CurrentMedication", "Vaccines"
     );
     
     private static final Set<String> MANDATORY_FEATURES = Set.of(
-        "Book", "Cancel", "Complete", "PastConsultations", "Personel",
-        "ConsultationType", "ConsultationLocation", "InsuranceBilling"
+        "Book", "Modify", "Cancel", "PastConsultations", "InsuranceBilling"
+    );
+
+    private static final Set<String> DEFAULT_FEATURES = Set.of(
+            "Personel", "ConsultationType", "ConsultationLocation", "RoomType",
+        "Sort", "SortByDate", "SortByType", "SortByService",
+        "Search",
+
+        "Reminders", "AppointmentReminders", "MedicationReminders", "OtherReminders",
+        "Notification", "NotifyOnReschedule", "Re-scheduling",
+        "DarkMode", "BillingInformation", "CurrentMedication", "Vaccines"
     );
 
     /**
@@ -178,13 +185,7 @@ public class FeatureManager {
      */
     private void initializeDefaultFeatures() {
         activeFeatures.addAll(new ArrayList<>(MANDATORY_FEATURES));
-        
-        // Mandatory medical history
-        activeFeatures.add("PastConsultations");
-        
-        // Default optional features
-        activeFeatures.add("BasicSearch");
-        activeFeatures.add("Reminders");
+        activeFeatures.addAll(new ArrayList<>(DEFAULT_FEATURES));
     }
     
     /**

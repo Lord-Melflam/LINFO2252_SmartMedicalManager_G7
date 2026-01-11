@@ -4,7 +4,6 @@ import com.mycompany.data.Appointment;
 import com.mycompany.data.Notification;
 import com.mycompany.data.TimeEvent;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -21,9 +20,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AppointmentNotificationManager implements TimeEventObserver {
     private static final String TAG = "AppointmentNotificationService";
+
+    private static AppointmentNotificationManager instance;
     
     private final NotificationManager notificationManager;
     private final TimeEventManager timeEventManager;
+    private final FeatureManager featureManager;
     private final Logger logger = Logger.getInstance();
 
     // Maps event IDs to their associated appointments and metadata
@@ -34,8 +36,12 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * This is primarily used by the Home screen to render a clickable "Upcoming reminders" list.
      */
     public List<Appointment> getUpcomingReminderAppointments(int limit) {
+        if (!isAppointmentRemindersEnabled()) {
+            return java.util.Collections.emptyList();
+        }
+
         int effectiveLimit = (limit <= 0) ? Integer.MAX_VALUE : limit;
-        long now = System.currentTimeMillis();
+        long now = nowMillis();
 
         Set<Appointment> unique = new HashSet<>();
         for (AppointmentEventData data : eventRegistry.values()) {
@@ -63,11 +69,50 @@ public class AppointmentNotificationManager implements TimeEventObserver {
         return result;
     }
 
-    public AppointmentNotificationManager(NotificationManager notificationManager, TimeEventManager timeEventManager) {
-        this.notificationManager = notificationManager;
-        this.timeEventManager = timeEventManager;
-        timeEventManager.registerListener(this);
+    public static synchronized AppointmentNotificationManager getInstance() {
+        if (instance == null) {
+            instance = new AppointmentNotificationManager();
+        }
+        return instance;
+    }
+
+    private AppointmentNotificationManager() {
+        this.notificationManager = NotificationManager.getInstance();
+        this.timeEventManager = TimeEventManager.getInstance();
+        this.featureManager = FeatureManager.getInstance();
+
+        this.timeEventManager.registerListener(this);
         logger.log(TAG, "AppointmentNotificationService initialized and registered as listener.");
+    }
+
+    private boolean isNotificationsEnabled() {
+        try {
+            return featureManager != null && featureManager.isFeatureActive("Notification");
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private boolean isAppointmentRemindersEnabled() {
+        try {
+            if (featureManager == null) {
+                return true;
+            }
+
+            if (!featureManager.isFeatureActive("Reminders")) {
+                return false;
+            }
+
+            // If any specific reminder category is enabled, use it as an explicit selector.
+            boolean anySpecific =
+                featureManager.isFeatureActive("AppointmentReminders") ||
+                featureManager.isFeatureActive("MedicationReminders") ||
+                featureManager.isFeatureActive("OtherReminders");
+
+            return !anySpecific || featureManager.isFeatureActive("AppointmentReminders");
+        } catch (Exception ignored) {
+            return true;
+        }
     }
 
     private long nowMillis() {
@@ -95,7 +140,11 @@ public class AppointmentNotificationManager implements TimeEventObserver {
                 sendAppointmentReminder(eventData.appointment, eventData.hoursBeforeAppointment);
                 break;
             case CANCELLATION:
-                sendCancellationNotice(eventData.appointment, eventData.cancelledBy, eventData.reason);
+                if (eventData.reason != null && eventData.reason.equalsIgnoreCase("Doctor Unavailable")) {
+                    sendDoctorUnavailableNotice(eventData.appointment, eventData.reason);
+                } else {
+                    sendCancellationNotice(eventData.appointment, eventData.cancelledBy, eventData.reason);
+                }
                 break;
             default:
                 logger.log(TAG, "Unknown event type for: " + event.getId());
@@ -113,6 +162,10 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      */
     public void scheduleAppointmentReminder(Appointment appointment, int hoursBeforeAppointment) {
         try {
+            if (!isAppointmentRemindersEnabled()) {
+                return;
+            }
+
             if (hoursBeforeAppointment < 0) {
                 logger.logError(TAG, "hoursBeforeAppointment must be >= 0");
                 return;
@@ -146,6 +199,10 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * Sends an immediate reminder notification for an appointment.
      */
     private void sendAppointmentReminder(Appointment appointment, int hoursBeforeAppointment) {
+        if (!isNotificationsEnabled() || !isAppointmentRemindersEnabled()) {
+            return;
+        }
+
         String title = "Appointment Reminder";
         String message = String.format(
                 "Your appointment with %s is in %d hour(s).\nDate: %s at %s\nLocation: %s",
@@ -170,6 +227,10 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * @param reason     Optional reason for cancellation
      */
     public void sendCancellationNotice(Appointment appointment, String cancelledBy, String reason) {
+        if (!isNotificationsEnabled()) {
+            return;
+        }
+
         String title = "Appointment Cancelled";
         String message = String.format(
                 "Your appointment with %s on %s at %s has been cancelled.\nCancelled by: %s%s",
@@ -191,7 +252,12 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * Useful for advance notice of unavailability.
      */
     public void scheduleCancellationNotice(Appointment appointment, String cancelledBy, String reason, Date noticeTime) {
-        String eventId = "cancellation_" + appointment.getDate() + "_" + appointment.getTime();
+        if (!isNotificationsEnabled()) {
+            return;
+        }
+
+        long when = (noticeTime == null) ? nowMillis() : noticeTime.getTime();
+        String eventId = "cancellation_" + appointment.getDate() + "_" + appointment.getTime() + "_" + when;
         String description = "Cancellation notice for appointment with " + appointment.getDoctor();
 
         TimeEvent cancellationEvent = new TimeEvent(eventId, noticeTime, description);
@@ -213,6 +279,10 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * Sends an immediate unavailability notice (doctor can't make it on short notice).
      */
     public void sendDoctorUnavailableNotice(Appointment appointment, String reason) {
+        if (!isNotificationsEnabled()) {
+            return;
+        }
+
         String title = "Doctor Unavailable";
         String message = String.format(
                 "Dr. %s is unable to attend your appointment on %s at %s.\n%s\nPlease contact the office to reschedule.",
@@ -231,6 +301,18 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * Sends a rescheduling suggestion notification.
      */
     public void sendRescheduleNotification(Appointment appointment, String suggestedDate, String suggestedTime) {
+        if (!isNotificationsEnabled()) {
+            return;
+        }
+
+        try {
+            if (featureManager != null && !featureManager.isFeatureActive("NotifyOnReschedule")) {
+                return;
+            }
+        } catch (Exception ignored) {
+            // If feature lookup fails, do not block notification.
+        }
+
         String title = "Reschedule Appointment";
         String message = String.format(
                 "Your appointment with %s on %s at %s needs to be rescheduled.\nSuggested new time: %s at %s\nPlease confirm or contact the office.",
