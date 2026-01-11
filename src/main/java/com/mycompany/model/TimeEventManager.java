@@ -40,10 +40,6 @@ public class TimeEventManager {
         return new Date(currentDate.getTime()); 
     }
 
-    public synchronized Date getCurrentDate() {
-        return getDate();
-    }
-
     /**
      * Formats the given date using the TimeEvent system's default display format.
      */

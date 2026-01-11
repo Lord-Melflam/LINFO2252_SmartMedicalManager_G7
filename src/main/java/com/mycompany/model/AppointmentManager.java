@@ -69,7 +69,7 @@ public class AppointmentManager implements TimeChangeObserver {
      */
     private void initializeSampleData() {
         addAppointment(new Appointment(
-            "22-12-2025", "10:00", "Dr. Angst", "Hospital Dav", "Stomach pain", "Confirmed",
+            "22-12-2025", "10:00", "Dr. Angst", "Hospital Dav", "Stomach pain", "Scheduled",
             new HashMap<>(Map.of(
                 "consultationType", "General Consultation",
                 "price", "100 EUR",
@@ -196,9 +196,41 @@ public class AppointmentManager implements TimeChangeObserver {
     /**
      * Cancels an appointment by changing its status.
      */
-    public synchronized void cancelAppointment(Appointment appointment) {
+    public synchronized boolean cancelAppointment(Appointment appointment) {
+        if (!canCancelAppointment(appointment)) {
+            return false;
+        }
         appointment.setStatus("Cancelled");
         updateAppointment(appointment);
+        return true;
+    }
+
+    /**
+     * Returns true if the appointment is eligible for cancellation.
+     * Rule: only upcoming (date-time >= simulated now) and not already Cancelled/Completed.
+     */
+    public synchronized boolean canCancelAppointment(Appointment appointment) {
+        if (appointment == null) {
+            return false;
+        }
+
+        String status = appointment.getStatus();
+        if (status == null) {
+            return false;
+        }
+
+        if ("Cancelled".equalsIgnoreCase(status) || "Completed".equalsIgnoreCase(status)) {
+            return false;
+        }
+
+        // Only allow cancelling upcoming appointments.
+        Date now = timeEventManager.getDate();
+        Date appointmentDate = appointment.getDateAsDate();
+        if (appointmentDate == null || now == null) {
+            return false;
+        }
+
+        return !appointmentDate.before(now);
     }
     
     /**

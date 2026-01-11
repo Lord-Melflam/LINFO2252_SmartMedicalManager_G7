@@ -17,11 +17,11 @@ import com.mycompany.ui.components.*;
 import javax.swing.*;
 import javax.swing.table.TableRowSorter;
 
-import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
 import java.util.*;
 
 
@@ -1108,8 +1108,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 appointmentManager.getUpcomingAppointments() :
                 appointmentManager.getPastAppointments();
 
-            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
-
             // Update header and toggle button
             jLabel6.setText(showUpcomingOnHome ? "Upcoming Appointments" : "Past Appointments");
             if (toggleAppointmentsBtn != null) {
@@ -1159,7 +1157,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 // Build rows: [Label][View Details]
                 for (Appointment apt : appointments) {
                     try {
-                        LocalDate aptDate = LocalDate.parse(apt.getDate(), formatter);
+                        LocalDate aptDate = LocalDate.parse(apt.getDate(), UI_DATE_FMT);
                         DayOfWeek dayOfWeek = aptDate.getDayOfWeek();
                         String dayName = dayOfWeek.toString().substring(0, 1).toUpperCase() +
                                 dayOfWeek.toString().substring(1).toLowerCase();
@@ -1425,7 +1423,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 return;
             }
 
-            String dateStr = new java.text.SimpleDateFormat("dd-MM-yyyy").format(selectedDate);
+            String dateStr = selectedDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate().format(UI_DATE_FMT);
             
             // Get time from time picker if available, otherwise default to 09:00
             String timeStr = "09:00";
@@ -1552,8 +1550,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 personnel.setSelectedItem(selected.getDoctor());
                 
                 // Scroll to date in calendar
-                java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy");
-                java.time.LocalDate aptDate = java.time.LocalDate.parse(selected.getDate(), formatter);
+                java.time.LocalDate aptDate = java.time.LocalDate.parse(selected.getDate(), UI_DATE_FMT);
                 java.util.Calendar cal = java.util.Calendar.getInstance();
                 cal.set(aptDate.getYear(), aptDate.getMonthValue() - 1, aptDate.getDayOfMonth());
                 date.setDate(cal.getTime());
@@ -1592,6 +1589,16 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         int selectedRow = appointmentsTable.getSelectedRow();
         if (selectedRow >= 0) {
             Appointment selected = appointmentModel.getAppointmentAt(selectedRow);
+
+            if (!appointmentManager.canCancelAppointment(selected)) {
+                javax.swing.JOptionPane.showMessageDialog(
+                    this,
+                    "Only upcoming appointments can be cancelled (and not already completed/cancelled).",
+                    "Cannot cancel",
+                    javax.swing.JOptionPane.WARNING_MESSAGE
+                );
+                return;
+            }
             
             // Ask for cancellation reason
             String[] options = {"Patient Request", "Doctor Unavailable", "Other"};
@@ -1608,7 +1615,16 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 String cancelledBy = choice == 1 ? "Doctor" : "Patient";
                 String reason = options[choice];
                 
-                appointmentManager.cancelAppointment(selected);
+                boolean cancelled = appointmentManager.cancelAppointment(selected);
+                if (!cancelled) {
+                    javax.swing.JOptionPane.showMessageDialog(
+                        this,
+                        "Only upcoming appointments can be cancelled.",
+                        "Cannot cancel",
+                        javax.swing.JOptionPane.WARNING_MESSAGE
+                    );
+                    return;
+                }
                 
                 // Send cancellation notification
                 appointmentNotificationManager.sendCancellationNotice(selected, cancelledBy, reason);
@@ -1689,22 +1705,21 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     }//GEN-LAST:event_jButton7ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // Navigate to Appointments tab
-        mainTabs.setSelectedIndex(1); // 1 = Appointments tab
-        logger.log(TAG, "Navigated to Appointments tab from home page");
+        navigateToAppointmentsTabFromHome();
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-        // Navigate to Appointments tab
-        mainTabs.setSelectedIndex(1); // 1 = Appointments tab
-        logger.log(TAG, "Navigated to Appointments tab from home page");
+        navigateToAppointmentsTabFromHome();
     }//GEN-LAST:event_jButton2ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
-        // Navigate to Appointments tab
+        navigateToAppointmentsTabFromHome();
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void navigateToAppointmentsTabFromHome() {
         mainTabs.setSelectedIndex(1); // 1 = Appointments tab
         logger.log(TAG, "Navigated to Appointments tab from home page");
-    }//GEN-LAST:event_jButton3ActionPerformed
+    }
 
     private void jComboBox1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jComboBox1ActionPerformed
         String selected = (String) jComboBox1.getSelectedItem();
@@ -1738,7 +1753,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             patientManager.setInsuranceLevel(level.trim());
         }
         updateProfileDisplay();
-        // TODO: Update available appointment options based on insurance
     }
     
     @Override

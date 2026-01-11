@@ -102,6 +102,7 @@ git push -u origin dev2
    - Show an appointment being created, modified, cancelled or completed and how the home page updates accordingly.
    - Show that an appointment can't be booked or rescheduled to a time in the past.
    - Show that UX is intuitive by adding shortcuts (double clicks on appointments, time picker will open on current date/time, etc.)
+   - Show sorting on columns.
 4. Mention architecture:
    - Managers + Observers (Model), `MainFrame` UI and handlers (View/Controller), reusable UI components.
 

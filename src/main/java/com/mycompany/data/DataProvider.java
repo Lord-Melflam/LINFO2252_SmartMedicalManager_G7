@@ -129,13 +129,6 @@ public class DataProvider {
     }
     
     /**
-     * Gets options by category.
-     */
-    public List<String> getOptions(String category) {
-        return new ArrayList<>(optionsMap.getOrDefault(category, new ArrayList<>()));
-    }
-    
-    /**
      * Gets options as array (for UI components).
      */
     public String[] getOptionsArray(String category) {
@@ -151,32 +144,6 @@ public class DataProvider {
      */
     public boolean hasCategory(String category) {
         return optionsMap.containsKey(category);
-    }
-    
-    /**
-     * Adds custom options (for runtime extensions).
-     */
-    public void addOption(String category, String option) {
-        optionsMap.computeIfAbsent(category, k -> new ArrayList<>()).add(option);
-        logger.log("DataProvider", "Added option '" + option + "' to category '" + category + "'.");
-    }
-    
-    /**
-     * Adds multiple options to a category.
-     */
-    public void addOptions(String category, List<String> options) {
-        optionsMap.computeIfAbsent(category, k -> new ArrayList<>()).addAll(options);
-        logger.log("DataProvider", "Added options to category '" + category + "'.");
-    }
-
-    /**
-     * Remove an option from a category.
-     */
-    public void removeOption(String category, String option) {
-        List<String> options = optionsMap.get(category);
-        if (options != null && options.remove(option)) {
-            logger.log("DataProvider", "Removed option '" + option + "' from category '" + category + "'.");
-        }
     }
 
     /**

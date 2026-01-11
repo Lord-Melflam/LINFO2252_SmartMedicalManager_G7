@@ -53,7 +53,7 @@ public class FeatureManager {
     
     private static final Set<String> MANDATORY_FEATURES = Set.of(
         "Book", "Cancel", "Complete", "PastConsultations", "Personel",
-        "ConsultationType", "ConsultationLocation", "RoomType", "InsuranceBilling"
+        "ConsultationType", "ConsultationLocation", "InsuranceBilling"
     );
 
     /**
@@ -256,7 +256,7 @@ public class FeatureManager {
      * Checks if a feature is mandatory (cannot be deactivated).
      */
     public boolean isMandatory(String feature) {
-        return Set.of("Book", "Cancel", "Complete", "PastConsultations").contains(feature);
+        return MANDATORY_FEATURES.contains(feature);
     }
     
     /**
