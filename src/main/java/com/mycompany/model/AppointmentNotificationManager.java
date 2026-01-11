@@ -346,7 +346,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
 
         String title = "Doctor Unavailable";
         String message = String.format(
-                "Dr. %s is unable to attend your appointment on %s at %s.\n%s\nPlease contact the office to reschedule.",
+                "%s is unable to attend your appointment on %s at %s.\n%s\nPlease contact the office to reschedule.",
                 appointment.getDoctor(),
                 appointment.getDate(),
                 appointment.getTime(),
