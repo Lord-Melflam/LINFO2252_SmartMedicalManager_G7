@@ -11,7 +11,7 @@ import java.util.Map;
  */
 public class Appointment {
     private String date;
-    private String time;  // NEW: Time slot (HH:mm format)
+    private String time;  
     private String doctor;
     private String location;
     private String reason;
@@ -107,7 +107,7 @@ public class Appointment {
             this.date = dateFormat.format(date);
             this.time = timeFormat.format(date);
         } catch (Exception e) {
-            // Ignore
+            
         }
     }
     

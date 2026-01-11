@@ -105,6 +105,8 @@ git push -u origin dev2
    - Show sorting on columns.
 4. Mention architecture:
    - Managers + Observers (Model), `MainFrame` UI and handlers (View/Controller), reusable UI components.
+   - Talk about time type handling struggles.
+   - Talk about god class `MainFrame` and possible refactoring.
 
 ## Future Work
 - Data persistence (JSON/SQLite) — see guide not committed.

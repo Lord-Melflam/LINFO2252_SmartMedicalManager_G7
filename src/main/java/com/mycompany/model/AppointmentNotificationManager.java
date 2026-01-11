@@ -103,13 +103,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
                 return false;
             }
 
-            // If any specific reminder category is enabled, use it as an explicit selector.
-            boolean anySpecific =
-                featureManager.isFeatureActive("AppointmentReminders") ||
-                featureManager.isFeatureActive("MedicationReminders") ||
-                featureManager.isFeatureActive("OtherReminders");
-
-            return !anySpecific || featureManager.isFeatureActive("AppointmentReminders");
+            return featureManager.isFeatureActive("AppointmentReminders");
         } catch (Exception ignored) {
             return true;
         }
@@ -305,12 +299,8 @@ public class AppointmentNotificationManager implements TimeEventObserver {
             return;
         }
 
-        try {
-            if (featureManager != null && !featureManager.isFeatureActive("NotifyOnReschedule")) {
-                return;
-            }
-        } catch (Exception ignored) {
-            // If feature lookup fails, do not block notification.
+        if (featureManager != null && !featureManager.isFeatureActive("NotifyOnReschedule")) {
+            return;
         }
 
         String title = "Reschedule Appointment";
@@ -327,8 +317,6 @@ public class AppointmentNotificationManager implements TimeEventObserver {
         notificationManager.send(notification);
         logger.log(TAG, "Sent reschedule notification for appointment " + appointment.getDate() + " " + appointment.getTime());
     }
-
-    // Internal data structures
 
     private enum EventType {
         REMINDER,

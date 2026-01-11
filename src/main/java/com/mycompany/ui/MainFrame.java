@@ -966,7 +966,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
      * UI layer only handles getting the search text.
      */
     private void performSearch() {
-        if (!(featureManager.isFeatureActive("BasicSearch")) && !(featureManager.isFeatureActive("AdvancedSearch"))) {
+        if (!(featureManager.isFeatureActive("Search"))) {
             appointmentModel.clearFilter();
             return; 
         }
@@ -1673,6 +1673,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 
                 // Route cancellation through the simulated TimeEvent system
                 appointmentNotificationManager.scheduleCancellationNotice(selected, cancelledBy, reason, timeEventManager.getDate());
+
+                // If the appointment was NOT cancelled by the patient (e.g., doctor unavailable), suggest a reschedule.
+                if (!"Patient".equalsIgnoreCase(cancelledBy)) {
+                    String suggestedDate = buildSuggestedRescheduleDate(selected);
+                    String suggestedTime = buildSuggestedRescheduleTime(selected);
+                    appointmentNotificationManager.sendRescheduleNotification(selected, suggestedDate, suggestedTime);
+                }
                 
                 javax.swing.JOptionPane.showMessageDialog(this, "Appointment cancelled successfully.");
                 logger.log(TAG, "Appointment cancelled by " + cancelledBy);
@@ -1681,6 +1688,33 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             javax.swing.JOptionPane.showMessageDialog(this, "Please select an appointment to cancel.");
         }
     }//GEN-LAST:event_cancelAppBtnActionPerformed
+
+    private String buildSuggestedRescheduleDate(Appointment appointment) {
+        try {
+            java.time.LocalDate base = java.time.LocalDate.parse(appointment.getDate(), UI_DATE_FMT);
+            java.time.LocalDate suggested = base.plusWeeks(1);
+
+            if (timeEventManager != null && timeEventManager.getDate() != null) {
+                java.time.LocalDate simulatedNow = timeEventManager.getDate().toInstant()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate();
+                if (suggested.isBefore(simulatedNow)) {
+                    suggested = simulatedNow.plusDays(1);
+                }
+            }
+
+            return suggested.format(UI_DATE_FMT);
+        } catch (Exception ignored) {
+            java.time.LocalDate suggested = java.time.LocalDate.now().plusDays(1);
+            return suggested.format(UI_DATE_FMT);
+        }
+    }
+
+    private String buildSuggestedRescheduleTime(Appointment appointment) {
+        String time = (appointment == null) ? null : appointment.getTime();
+        time = (time == null) ? "" : time.trim();
+        return time.isEmpty() ? "09:00" : time;
+    }
 
     private void applyFilterBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyFilterBtnActionPerformed
         int selectedIndex = timePeriodList.getSelectedIndex();
