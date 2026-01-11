@@ -32,7 +32,7 @@ import java.util.*;
  *
  * @author Ji
  */
-public class MainFrame extends javax.swing.JFrame implements FeatureObserver, PatientObserver, AppointmentObserver, NotificationObserver {
+public class MainFrame extends javax.swing.JFrame implements FeatureObserver, PatientObserver, AppointmentObserver, NotificationObserver, TimeChangeObserver {
     
     private static final Logger logger = Logger.getInstance();
     private static final String TAG = "View";
@@ -45,14 +45,17 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private PatientManager patientManager;
     private DataProvider dataProvider;
     private TimePickerPanel timePicker;
+    private TimePickerPanel adminTimePicker;
     private boolean showUpcomingOnHome = true; // Toggle for home page appointments
     private Appointment appointmentBeingModified = null; // Track which appointment is being edited
     private AppointmentNotificationManager appointmentNotificationManager;
-    private java.util.List<Appointment> homeReminderAppointments = java.util.List.of();
     private boolean homeReminderListListenerInstalled = false;
     private NotificationManager notificationManager;
     private TimeEventManager timeEventManager;
-    private DefaultListModel<String> notificationListModel;
+    private DefaultListModel<String> homeFeedModel;
+    private final java.util.List<HomeFeedItem> homeFeedItems = new java.util.ArrayList<>();
+    private final java.util.List<Notification> homeNotifications = new java.util.ArrayList<>();
+    private static final int HOME_MAX_NOTIFICATIONS = 30;
     private javax.swing.JScrollPane adminFeatureScroll;
     private javax.swing.JPanel adminFeaturePanel;
     private final Map<String, JPanel> adminFeatureRows = new HashMap<>();
@@ -64,12 +67,18 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     public MainFrame() {
         initComponents();
 
+        // Home feed list combines reminders + notifications
+        this.homeFeedModel = new DefaultListModel<>();
+        jList1.setModel(homeFeedModel);
+
         this.appointmentManager = AppointmentManager.getInstance();
         this.featureManager = FeatureManager.getInstance();
         this.patientManager = PatientManager.getInstance();
         this.dataProvider = DataProvider.getInstance();
         this.timeEventManager = TimeEventManager.getInstance();
         this.notificationManager = NotificationManager.getInstance();
+
+        timeEventManager.registerTimeObserver(this);
 
         // Register as observer for model changes
         appointmentManager.registerObserver(this);
@@ -81,6 +90,17 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         
         initializeUI();
         logger.log(TAG, "MainFrame constructed and UI initialized.");
+    }
+
+    @Override
+    public void onTimeChanged(java.util.Date newNow) {
+        SwingUtilities.invokeLater(() -> {
+            updateHomePageAppointments();
+            // Also repaint appointments table because sorting/filtering depends on simulated 'now'
+            if (appointmentsTable != null) {
+                appointmentsTable.repaint();
+            }
+        });
     }
     
     /**
@@ -103,6 +123,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         try {
             jCalendar1.addPropertyChangeListener("calendar", evt -> onAdminCalendarChanged());
             jCalendar1.addPropertyChangeListener("date", evt -> onAdminCalendarChanged());
+
+            if (adminTimePicker != null) {
+                adminTimePicker.addChangeListener(e -> onAdminCalendarChanged());
+            }
+
+            // Apply current UI selection once at startup
+            onAdminCalendarChanged();
         } catch (Exception e) {
             logger.logError(TAG, "Failed to bind time event calendar: " + e.getMessage());
         }
@@ -113,7 +140,24 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             java.util.Date d = jCalendar1.getDate();
             if (d == null) return;
 
-            timeEventManager.setDate(d);
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.setTime(d);
+
+            if (adminTimePicker != null) {
+                String t = adminTimePicker.getSelectedTime();
+                String[] parts = (t == null) ? new String[0] : t.split(":");
+                if (parts.length == 2) {
+                    int hour = Integer.parseInt(parts[0]);
+                    int minute = Integer.parseInt(parts[1]);
+                    timeEventManager.setDateTime(d, hour, minute);
+                    logger.log(TAG, "Admin date/time changed, updated TimeEventManager date.");
+                    return;
+                }
+            }
+            cal.set(java.util.Calendar.SECOND, 0);
+            cal.set(java.util.Calendar.MILLISECOND, 0);
+
+            timeEventManager.setDate(cal.getTime());
             logger.log(TAG, "Admin calendar changed, updated TimeEventManager date.");
         } catch (Exception e) {
             logger.logError(TAG, "Error applying time event calendar selection: " + e.getMessage());
@@ -401,11 +445,9 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         jComboBox5 = new javax.swing.JComboBox<>();
         jLabel17 = new javax.swing.JLabel();
         adminTab = new javax.swing.JPanel();
-        jTextField1 = new javax.swing.JTextField();
-        jButton4 = new javax.swing.JButton();
-        jComboBox6 = new javax.swing.JComboBox<>();
         jLabel19 = new javax.swing.JLabel();
         jCalendar1 = new com.toedter.calendar.JCalendar();
+        adminTimePicker = new com.mycompany.ui.components.TimePickerPanel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -813,28 +855,22 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                                 .addContainerGap()
                                 .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                         .addComponent(adminFeatureScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 700, Short.MAX_VALUE)
-                                        .addGroup(adminTabLayout.createSequentialGroup()
-                                                .addComponent(jComboBox6, javax.swing.GroupLayout.PREFERRED_SIZE, 137, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addGap(18, 18, 18)
-                                                .addComponent(jButton4, javax.swing.GroupLayout.PREFERRED_SIZE, 96, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addGap(18, 18, 18)
-                                                .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 149, javax.swing.GroupLayout.PREFERRED_SIZE))
                                         .addComponent(jLabel19)
-                                        .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGroup(adminTabLayout.createSequentialGroup()
+                            .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGap(18, 18, 18)
+                            .addComponent(adminTimePicker, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                                 .addContainerGap())
         );
         adminTabLayout.setVerticalGroup(
                 adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGroup(adminTabLayout.createSequentialGroup()
                                 .addContainerGap()
-                                .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(jComboBox6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(jButton4)
-                                        .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jLabel19)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(adminTimePicker, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(adminFeatureScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
                                 .addContainerGap())
@@ -1068,8 +1104,21 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                     public void mouseClicked(java.awt.event.MouseEvent e) {
                         if (e.getClickCount() == 2) {
                             int idx = jList1.locationToIndex(e.getPoint());
-                            if (idx >= 0 && idx < homeReminderAppointments.size()) {
-                                navigateToAppointment(homeReminderAppointments.get(idx));
+                            if (idx >= 0 && idx < homeFeedItems.size()) {
+                                HomeFeedItem item = homeFeedItems.get(idx);
+                                if (item == null) {
+                                    return;
+                                }
+                                if (item.type == HomeFeedItemType.REMINDER && item.appointment != null) {
+                                    navigateToAppointment(item.appointment);
+                                } else if (item.type == HomeFeedItemType.NOTIFICATION && item.notification != null) {
+                                    javax.swing.JOptionPane.showMessageDialog(
+                                            MainFrame.this,
+                                            item.notification.getMessage(),
+                                            item.notification.getTitle(),
+                                            javax.swing.JOptionPane.INFORMATION_MESSAGE
+                                    );
+                                }
                             }
                         }
                     }
@@ -1084,11 +1133,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 jPanel2.add(emptyLabel);
                 jLabel2.setVisible(showUpcomingOnHome);
                 notificationsRemindersList.setVisible(showUpcomingOnHome);
-                if (showUpcomingOnHome) {
-                    jList1.setListData(new String[]{emptyMessage});
-                } else {
-                    jList1.setListData(new String[0]);
-                }
             } else {
                 // Build rows: [Label][View Details]
                 for (Appointment apt : appointments) {
@@ -1121,22 +1165,9 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
                 jLabel2.setVisible(showUpcomingOnHome);
                 notificationsRemindersList.setVisible(showUpcomingOnHome);
-                if (showUpcomingOnHome) {
-                    // Show upcoming appointments that have scheduled reminders.
-                    homeReminderAppointments = appointmentNotificationManager.getUpcomingReminderAppointments(10);
-                    if (homeReminderAppointments.isEmpty()) {
-                        jList1.setListData(new String[]{"No scheduled appointment reminders"});
-                    } else {
-                        java.util.List<String> reminders = new java.util.ArrayList<>();
-                        for (Appointment apt : homeReminderAppointments) {
-                            reminders.add(apt.getDoctor() + " - " + apt.getDate() + " at " + apt.getTime());
-                        }
-                        jList1.setListData(reminders.toArray(new String[0]));
-                    }
-                } else {
-                    jList1.setListData(new String[0]);
-                }
             }
+
+            rebuildHomeFeedModel();
 
             // Refresh the panel
             jPanel2.revalidate();
@@ -1144,6 +1175,69 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         } catch (Exception e) {
             logger.logError(TAG, "Error updating home page: " + e.getMessage());
         }
+    }
+
+    private void rebuildHomeFeedModel() {
+        if (homeFeedModel == null) {
+            return;
+        }
+
+        homeFeedModel.clear();
+        homeFeedItems.clear();
+
+        if (!showUpcomingOnHome) {
+            return;
+        }
+
+        addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.HEADER,
+                "Reminders (double-click to open appointment)", null, null));
+
+        java.util.List<Appointment> reminders = java.util.Collections.emptyList();
+        try {
+            if (appointmentNotificationManager != null) {
+                reminders = appointmentNotificationManager.getUpcomingReminderAppointments(10);
+            }
+        } catch (Exception ignored) {
+            reminders = java.util.Collections.emptyList();
+        }
+
+        reminders.sort(java.util.Comparator.comparing(a -> {
+            java.util.Date d = a.getDateAsDate();
+            return (d == null) ? new java.util.Date(Long.MAX_VALUE) : d;
+        }));
+
+        if (reminders.isEmpty()) {
+            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, "(no scheduled reminders)", null, null));
+        } else {
+            for (Appointment apt : reminders) {
+                String display = "REMINDER: " + apt.getDoctor() + " — " + apt.getDate() + " " + apt.getTime();
+                addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.REMINDER, display, apt, null));
+            }
+        }
+
+        addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, " ", null, null));
+
+        addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.HEADER,
+                "Notifications (double-click to view)", null, null));
+
+        if (homeNotifications.isEmpty()) {
+            addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.PLAIN, "(no notifications yet)", null, null));
+        } else {
+            int count = 0;
+            for (Notification n : homeNotifications) {
+                if (n == null) continue;
+                if (count >= HOME_MAX_NOTIFICATIONS) break;
+                count++;
+                String ts = (timeEventManager == null) ? "" : timeEventManager.formatMillis(n.getTimestamp());
+                String display = "[" + ts + "] " + n.getTitle();
+                addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.NOTIFICATION, display, null, n));
+            }
+        }
+    }
+
+    private void addHomeFeedItem(HomeFeedItem item) {
+        homeFeedItems.add(item);
+        homeFeedModel.addElement(item.displayText);
     }
 
     private void navigateToAppointment(Appointment apt) {
@@ -1302,11 +1396,12 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             String roomTypeSelected = (String) roomType.getSelectedItem();
             
             // Get date from calendar in dd-MM-yyyy format
-            java.util.Date selectedDate = date.getDate();
+            Date selectedDate = date.getDate();
             if (selectedDate == null) {
-                javax.swing.JOptionPane.showMessageDialog(this, "Please select a date.");
+                JOptionPane.showMessageDialog(this, "Please select a date.");
                 return;
             }
+
             String dateStr = new java.text.SimpleDateFormat("dd-MM-yyyy").format(selectedDate);
             
             // Get time from time picker if available, otherwise default to 09:00
@@ -1342,11 +1437,12 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                         "roomType", roomTypeSelected
                     )
                 );
-                
-                appointmentManager.addAppointment(newAppointment);
-                
-                // Schedule reminder for new appointment (24 hours before)
+
+                // Schedule reminder for new appointment (24 hours before) BEFORE notifying observers
+                // so the Home reminders list can reflect it immediately.
                 appointmentNotificationManager.scheduleAppointmentReminder(newAppointment, 24);
+
+                appointmentManager.addAppointment(newAppointment);
                 
                 javax.swing.JOptionPane.showMessageDialog(this, 
                     "Appointment booked successfully!\n" + dateStr + " at " + timeStr + " with " + doctor);
@@ -1576,12 +1672,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         logger.log(TAG, "Theme selected: " + selected);
     }//GEN-LAST:event_jComboBox1ActionPerformed
 
-    private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
-        String optionName = jTextField1.getText();
-        String category = (String) jComboBox6.getSelectedItem();
-        logger.log(TAG, "Adding option: " + optionName + " to category: " + category);
-    }//GEN-LAST:event_jTextField1ActionPerformed
-
     /**
      * @param args the command line arguments
      */
@@ -1648,19 +1738,49 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     /**
      * Implement NotificationListener to receive notifications in UI.
      */
-    // TODO fix notification usage so the system is used properly instead of just adding to groupbox
     @Override
     public void onNotification(Notification notification) {
-        // Add to notification list in UI
-        String displayText = notification.getTitle() + ": " + notification.getMessage();
-        notificationListModel.addElement(displayText);
+        if (notification == null) {
+            return;
+        }
+
         logger.log(TAG, "Notification received in UI: " + notification.getTitle());
 
-        if (notification.getTitle().contains("Cancelled") || notification.getTitle().contains("Unavailable")) {
-            javax.swing.JOptionPane.showMessageDialog(this, 
-                notification.getMessage(), 
-                notification.getTitle(), 
-                javax.swing.JOptionPane.WARNING_MESSAGE);
+        SwingUtilities.invokeLater(() -> {
+            homeNotifications.add(0, notification);
+            if (homeNotifications.size() > HOME_MAX_NOTIFICATIONS) {
+                homeNotifications.subList(HOME_MAX_NOTIFICATIONS, homeNotifications.size()).clear();
+            }
+
+            rebuildHomeFeedModel();
+
+            if (notification.getTitle().contains("Cancelled") || notification.getTitle().contains("Unavailable")) {
+                javax.swing.JOptionPane.showMessageDialog(this,
+                        notification.getMessage(),
+                        notification.getTitle(),
+                        javax.swing.JOptionPane.WARNING_MESSAGE);
+            }
+        });
+    }
+
+    private enum HomeFeedItemType {
+        HEADER,
+        PLAIN,
+        REMINDER,
+        NOTIFICATION
+    }
+
+    private static final class HomeFeedItem {
+        private final HomeFeedItemType type;
+        private final String displayText;
+        private final Appointment appointment;
+        private final Notification notification;
+
+        private HomeFeedItem(HomeFeedItemType type, String displayText, Appointment appointment, Notification notification) {
+            this.type = type;
+            this.displayText = displayText;
+            this.appointment = appointment;
+            this.notification = notification;
         }
     }
 
@@ -1688,7 +1808,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton2;
     private javax.swing.JButton jButton3;
-    private javax.swing.JButton jButton4;
     private javax.swing.JButton jButton6;
     private javax.swing.JButton jButton7;
     private com.toedter.calendar.JCalendar jCalendar1;
@@ -1702,7 +1821,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private javax.swing.JComboBox<String> jComboBox3;
     private javax.swing.JComboBox<String> jComboBox4;
     private javax.swing.JComboBox<String> jComboBox5;
-    private javax.swing.JComboBox<String> jComboBox6;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
@@ -1733,7 +1851,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea2;
-    private javax.swing.JTextField jTextField1;
     private javax.swing.JComboBox<String> location;
     private javax.swing.JTabbedPane mainTabs;
     private javax.swing.JButton modifyBtn;

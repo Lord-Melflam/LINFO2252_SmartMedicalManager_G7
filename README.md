@@ -94,6 +94,10 @@ git push -u origin dev2
    - Demonstrate search + filters under the "Search & Filters" section.
    - Demonstrate create/modify/cancel under "Appointment Operations".
    - Modify a cancelled appointment → confirm reschedule prompt.
+   - Use the time system to trigger events
+   - Modify insurance level in Patient Preferences and show feature gating.
+   - Modify insurance level and show profile updates. 
+   - Notification system: show a notification being sent and received. (Make sure to modify date after time, because TimePicker does not have change events).
 4. Mention architecture:
    - Managers + Observers (Model), `MainFrame` UI and handlers (View/Controller), reusable UI components.
 

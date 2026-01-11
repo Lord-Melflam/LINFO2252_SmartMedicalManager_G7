@@ -10,7 +10,7 @@ import java.util.*;
  * Handles creation, modification, cancellation, and querying of appointments.
  * Implements Observer pattern to notify Views of changes.
  */
-public class AppointmentManager {
+public class AppointmentManager implements TimeChangeObserver {
     private static AppointmentManager instance;
     private final TimeEventManager timeEventManager = TimeEventManager.getInstance();
     
@@ -21,6 +21,36 @@ public class AppointmentManager {
         this.allAppointments = new ArrayList<>();
         this.observers = new ArrayList<>();
         initializeSampleData();
+
+        // Keep appointment statuses consistent with the simulated time.
+        timeEventManager.registerTimeObserver(this);
+    }
+
+    @Override
+    public void onTimeChanged(Date newNow) {
+        refreshStatusesBasedOnNow(newNow);
+    }
+
+    public synchronized void refreshStatusesBasedOnNow(Date now) {
+        if (now == null) {
+            return;
+        }
+
+        java.util.List<Appointment> changed = new java.util.ArrayList<>();
+        for (Appointment appointment : allAppointments) {
+            if (appointment == null) continue;
+            if (!"Scheduled".equalsIgnoreCase(appointment.getStatus())) continue;
+
+            Date appointmentDate = appointment.getDateAsDate();
+            if (appointmentDate != null && appointmentDate.before(now)) {
+                appointment.setStatus("Completed");
+                changed.add(appointment);
+            }
+        }
+
+        for (Appointment appointment : changed) {
+            notifyObserversAppointmentUpdated(appointment);
+        }
     }
     
     /**
@@ -117,6 +147,7 @@ public class AppointmentManager {
      */
     public List<Appointment> getUpcomingAppointments() {
         final java.util.Date now = timeEventManager.getDate();
+        refreshStatusesBasedOnNow(now);
 
         return allAppointments.stream()
             .filter(a -> a.getStatus().equalsIgnoreCase("Scheduled"))
@@ -141,6 +172,7 @@ public class AppointmentManager {
      */
     public List<Appointment> getPastAppointments() {
         final java.util.Date now = timeEventManager.getDate();
+        refreshStatusesBasedOnNow(now);
 
         return allAppointments.stream()
             .filter(a -> {

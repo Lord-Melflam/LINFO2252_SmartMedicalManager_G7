@@ -1,6 +1,7 @@
 package com.mycompany.ui.components;
 
 import javax.swing.*;
+import javax.swing.event.ChangeListener;
 
 /**
  * Simple time picker for appointment booking.
@@ -26,6 +27,11 @@ public class TimePickerPanel extends JPanel {
         this.add(hourSpinner);
         this.add(new JLabel(":"));
         this.add(minuteSpinner);
+    }
+
+    public void addChangeListener(ChangeListener listener) {
+        hourSpinner.addChangeListener(listener);
+        minuteSpinner.addChangeListener(listener);
     }
     
     /**

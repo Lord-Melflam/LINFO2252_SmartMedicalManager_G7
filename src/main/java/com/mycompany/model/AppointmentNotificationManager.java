@@ -70,6 +70,15 @@ public class AppointmentNotificationManager implements TimeEventObserver {
         logger.log(TAG, "AppointmentNotificationService initialized and registered as listener.");
     }
 
+    private long nowMillis() {
+        try {
+            Date d = (timeEventManager == null) ? null : timeEventManager.getDate();
+            return (d == null) ? System.currentTimeMillis() : d.getTime();
+        } catch (Exception ignored) {
+            return System.currentTimeMillis();
+        }
+    }
+
     /**
      * Handles fired time events - dispatches to appropriate notification handler.
      */
@@ -147,7 +156,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
                 appointment.getLocation()
         );
 
-        Notification notification = new Notification(title, message, System.currentTimeMillis());
+        Notification notification = new Notification(title, message, nowMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent appointment reminder: " + appointment.getDate() + " " + appointment.getTime() +
                 " with " + appointment.getDoctor());
@@ -171,7 +180,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
                 reason != null && !reason.isEmpty() ? "\nReason: " + reason : ""
         );
 
-        Notification notification = new Notification(title, message, System.currentTimeMillis());
+        Notification notification = new Notification(title, message, nowMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent cancellation notice for appointment " + appointment.getDate() + " " + appointment.getTime() +
                 " (cancelled by " + cancelledBy + ")");
@@ -213,7 +222,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
                 reason != null && !reason.isEmpty() ? "Reason: " + reason : "Please reschedule at your earliest convenience."
         );
 
-        Notification notification = new Notification(title, message, System.currentTimeMillis());
+        Notification notification = new Notification(title, message, nowMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent doctor unavailable notice for appointment " + appointment.getDate() + " " + appointment.getTime());
     }
@@ -232,7 +241,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
                 suggestedTime
         );
 
-        Notification notification = new Notification(title, message, System.currentTimeMillis());
+        Notification notification = new Notification(title, message, nowMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent reschedule notification for appointment " + appointment.getDate() + " " + appointment.getTime());
     }
