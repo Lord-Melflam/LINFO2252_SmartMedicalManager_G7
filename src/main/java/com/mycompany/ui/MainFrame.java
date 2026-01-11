@@ -1027,6 +1027,28 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         // This requires modifying the layout, so we rebuild the right side
         bookPanel.removeAll();
         rebuildBookingPanel(rightPanel);
+
+        // Default booking date/time to the simulated "now" from the time-event system
+        setBookingPickersToSimulatedNow();
+    }
+
+    private void setBookingPickersToSimulatedNow() {
+        try {
+            java.util.Date now = (timeEventManager == null) ? new java.util.Date() : timeEventManager.getDate();
+            if (date != null) {
+                date.setDate(now);
+            }
+            if (timePicker != null) {
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.setTime(now);
+                String timeStr = String.format("%02d:%02d",
+                        cal.get(java.util.Calendar.HOUR_OF_DAY),
+                        cal.get(java.util.Calendar.MINUTE));
+                timePicker.setSelectedTime(timeStr);
+            }
+        } catch (Exception ignored) {
+            // keep defaults
+        }
     }
     
     /**
@@ -1373,6 +1395,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         logger.log(TAG, "Consultation type selected: " + selected);
     }//GEN-LAST:event_consultationTypeActionPerformed
 
+
     private void locationActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_locationActionPerformed
         String selected = (String) location.getSelectedItem();
         logger.log(TAG, "Location selected: " + selected);
@@ -1409,6 +1432,17 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             if (timePicker != null) {
                 timeStr = timePicker.getSelectedTime();
             }
+
+            // Only allow booking/rescheduling to future date-times (relative to simulated time-event "now")
+                if (timeEventManager != null && !timeEventManager.isFutureAppointment(selectedDate, timeStr)) {
+                javax.swing.JOptionPane.showMessageDialog(
+                    this,
+                    "Please choose a future appointment date/time.\nCurrent simulated time: " + timeEventManager.nowString(),
+                    "Invalid appointment time",
+                    javax.swing.JOptionPane.WARNING_MESSAGE
+                );
+                return;
+                }
             
             if (appointmentBeingModified != null) {
                 // UPDATE MODE: Modify existing appointment
@@ -1476,10 +1510,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         location.setSelectedIndex(0);
         personnel.setSelectedIndex(0);
         roomType.setSelectedIndex(0);
-        date.setDate(new java.util.Date()); // Set to today
-        if (timePicker != null) {
-            timePicker.setSelectedTime("09:00"); // Default time
-        }
+        setBookingPickersToSimulatedNow();
         
         // Show the book panel using CardLayout
         java.awt.CardLayout cl = (java.awt.CardLayout) appointmentsTab.getLayout();
@@ -1491,6 +1522,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         int selectedRow = appointmentsTable.getSelectedRow();
         if (selectedRow >= 0) {
             Appointment selected = appointmentModel.getAppointmentAt(selectedRow);
+
+            boolean reschedulingCancelled = false;
 
             // If appointment is cancelled, confirm rescheduling
             if ("Cancelled".equalsIgnoreCase(selected.getStatus())) {
@@ -1504,6 +1537,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 }
                 selected.setStatus("Scheduled");
                 appointmentManager.updateAppointment(selected);
+                reschedulingCancelled = true;
             }
 
             appointmentBeingModified = selected; // Track which appointment is being modified
@@ -1527,6 +1561,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 // Set time in time picker
                 if (timePicker != null) {
                     timePicker.setSelectedTime(selected.getTime());
+                }
+
+                // For rescheduling flow, start from the simulated current date/time
+                if (reschedulingCancelled) {
+                    setBookingPickersToSimulatedNow();
                 }
                 
                 // Change button text and navigate to booking form

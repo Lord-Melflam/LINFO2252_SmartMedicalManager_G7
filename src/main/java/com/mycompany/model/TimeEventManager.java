@@ -68,6 +68,42 @@ public class TimeEventManager {
         return format(currentDate);
     }
 
+    /**
+     * Validates that a date+time is strictly in the future relative to the simulated "now".
+     *
+     * @param selectedDate Date portion (time will be taken from timeStr)
+     * @param timeStr      HH:mm (or null/invalid -> treated as 00:00)
+     */
+    public synchronized boolean isFutureAppointment(Date selectedDate, String timeStr) {
+        if (selectedDate == null) {
+            return false;
+        }
+
+        int hour = 0;
+        int minute = 0;
+        try {
+            if (timeStr != null && timeStr.contains(":")) {
+                String[] parts = timeStr.split(":");
+                if (parts.length == 2) {
+                    hour = Integer.parseInt(parts[0]);
+                    minute = Integer.parseInt(parts[1]);
+                }
+            }
+        } catch (Exception ignored) {
+            hour = 0;
+            minute = 0;
+        }
+
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(selectedDate);
+        cal.set(Calendar.HOUR_OF_DAY, hour);
+        cal.set(Calendar.MINUTE, minute);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+
+        return cal.getTime().after(currentDate);
+    }
+
     public synchronized void setTime(int hour24, int minute) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(currentDate);

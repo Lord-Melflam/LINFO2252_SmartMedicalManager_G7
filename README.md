@@ -98,6 +98,10 @@ git push -u origin dev2
    - Modify insurance level in Patient Preferences and show feature gating.
    - Modify insurance level and show profile updates. 
    - Notification system: show a notification being sent and received. (Make sure to modify date after time, because TimePicker does not have change events).
+   - Reminder system: show a reminder being sent and received. (Make sure to modify date after time, because TimePicker does not have change events).
+   - Show an appointment being created, modified, cancelled or completed and how the home page updates accordingly.
+   - Show that an appointment can't be booked or rescheduled to a time in the past.
+   - Show that UX is intuitive by adding shortcuts (double clicks on appointments, time picker will open on current date/time, etc.)
 4. Mention architecture:
    - Managers + Observers (Model), `MainFrame` UI and handlers (View/Controller), reusable UI components.
 
