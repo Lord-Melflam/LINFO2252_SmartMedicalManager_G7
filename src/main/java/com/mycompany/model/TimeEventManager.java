@@ -11,8 +11,7 @@ import com.mycompany.data.TimeEvent;
 public class TimeEventManager {
     private final PriorityQueue<TimeEvent> queue = new PriorityQueue<>();
 
-    // Keep fired events so moving time backwards can "re-arm" them.
-    // Reverse-ordered by scheduledAt so we can efficiently move back the latest-fired first.
+
     private final PriorityQueue<TimeEvent> firedEvents =
         new PriorityQueue<>((a, b) -> b.getScheduledAt().compareTo(a.getScheduledAt()));
 
@@ -33,17 +32,15 @@ public class TimeEventManager {
     }
 
     public synchronized Date getDate() {
-        return new Date(currentDate.getTime()); // defensive copy
+        return new Date(currentDate.getTime()); 
     }
 
     public synchronized void setDate(Date newDate) {
         Date oldDate = this.currentDate;
 
-        // store defensive copy
         this.currentDate = (newDate == null) ? new Date(System.currentTimeMillis()) : new Date(newDate.getTime());
         logger.log("TimeEventManager", "Current date set to " + this.currentDate);
 
-        // If time moved backwards, restore events that should not have fired yet at the new date.
         if (this.currentDate.before(oldDate)) {
             rewindFiredEventsTo(this.currentDate);
         }
@@ -76,7 +73,6 @@ public class TimeEventManager {
     }
 
     private void rewindFiredEventsTo(Date newNow) {
-        // Move back any fired events that occur AFTER the new "now" (they shouldn't be fired yet).
         while (!firedEvents.isEmpty() && firedEvents.peek().getScheduledAt().after(newNow)) {
             queue.offer(firedEvents.poll());
         }
@@ -87,7 +83,6 @@ public class TimeEventManager {
         while (!queue.isEmpty() && !queue.peek().getScheduledAt().after(currentDate)) {
             TimeEvent event = queue.poll();
 
-            // Remember it was fired (enables rewinding time later)
             firedEvents.offer(event);
 
             logger.log("TimeEventManager", "Firing event '" + event.getId() + "': " + event.getDescription());

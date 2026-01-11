@@ -11,31 +11,32 @@ import java.util.function.Consumer;
  * Core component for dynamic, adaptive system behavior.
  */
 public class FeatureManager {
-    public enum InsuranceLevel {
-        MINIMAL, NORMAL, PREMIUM
-    }
+    public static final class ChoiceDefinition {
+        private final List<String> choices;
 
-    public enum NotificationMethod {
-        IN_APP, EMAIL, SMS
+        public ChoiceDefinition(List<String> choices) {
+            this.choices = (choices == null) ? List.of() : List.copyOf(choices);
+        }
+
+        public List<String> getChoices() {
+            return choices;
+        }
     }
 
     private static FeatureManager instance;
-
     private final Set<String> activeFeatures;
     private final List<FeatureObserver> observers;
-    private final Map<String, Map<String, Object>> featureAttributes; // Store feature-specific attributes
+    private final Map<String, Map<String, Object>> featureAttributes;
+    private final Set<String> insuranceDisabledFeatures = ConcurrentHashMap.newKeySet();
 
-    private InsuranceLevel insuranceLevel;
-    
-    // Available features as per feature diagram
     private static final Set<String> VALID_FEATURES = Set.of(
         // Appointment Features
         "Book", "Modify", "Cancel", "Complete", "Personel",
-        "ConsultationType", "ConsultationLocation", "RoomType", "SharedRoom", "PrivateRoom",
-        "Prepay", "DelayedPayment", "Card", "Cash", "InsuranceBilling",
+        "ConsultationType", "ConsultationLocation", "RoomType",
+        "InsuranceBilling",
         
         // Medical History Features
-        "PastConsultations", "Prescriptions",
+        "PastConsultations",
         "Sort", "SortByDate", "SortByType", "SortByService", "SearchByStaff",
         "BasicSearch", "AdvancedSearch",
         
@@ -49,19 +50,116 @@ public class FeatureManager {
         // User Profile
         "ContactMethod", "CurrentMedication", "Vaccines"
     );
-
+    
     private static final Set<String> MANDATORY_FEATURES = Set.of(
         "Book", "Cancel", "Complete", "PastConsultations", "Personel",
-            "ConsultationType", "ConsultationLocation", "RoomType", "SharedRoom", "PrivateRoom"
+        "ConsultationType", "ConsultationLocation", "RoomType", "InsuranceBilling"
     );
+
+    /**
+     * Declarative configuration schema for the Admin panel.
+     * Map: featureName -> choice definition.
+     */
+    private static final Map<String, ChoiceDefinition> FEATURE_CHOICES = Map.of(
+        "InsuranceBilling", new ChoiceDefinition(List.of("MINIMAL", "NORMAL", "PREMIUM")),
+        "Notification", new ChoiceDefinition(List.of("IN_APP", "EMAIL", "SMS"))
+    );
+
+    public enum InsuranceLevel {
+        MINIMAL,
+        NORMAL,
+        PREMIUM
+    }
+
+    /**
+     * Feature gating based on InsuranceBilling value.
+     * The integer is the minimum required index in the InsuranceBilling choices list.
+     * Example: if InsuranceBilling choices are [MINIMAL, NORMAL, PREMIUM], then:
+     */
+    private static final Map<String, Integer> FEATURE_MIN_INSURANCE_INDEX = Map.of(
+        // Room choice is only available from NORMAL and above
+        "RoomType", InsuranceLevel.NORMAL.ordinal(),
+        "SharedRoom", InsuranceLevel.NORMAL.ordinal(),
+        // Private room is only available for PREMIUM
+        "PrivateRoom", InsuranceLevel.PREMIUM.ordinal()
+    );
+
+    /**
+     * Returns the choice definition for a feature, or null if the feature is free-text.
+     */
+    public static ChoiceDefinition getChoiceDefinition(String featureName) {
+        if (!VALID_FEATURES.contains(featureName)) {
+            throw new IllegalArgumentException("Unknown feature: " + featureName);
+        }
+        return FEATURE_CHOICES.get(featureName);
+    }
+
+    private static int insuranceIndexFromValue(String insuranceBillingValue) {
+        ChoiceDefinition def = FEATURE_CHOICES.get("InsuranceBilling");
+        if (def == null || def.getChoices().isEmpty()) {
+            return 0;
+        }
+
+        // return the index of the value, or default to NORMAL (1) if not found
+        for (int i = 0; i < def.getChoices().size(); i++) {
+            if (def.getChoices().get(i).equalsIgnoreCase(insuranceBillingValue)) {
+                return i;
+            }
+        }
+
+        return Math.min(InsuranceLevel.NORMAL.ordinal(), def.getChoices().size() - 1);
+    }
+
+    private boolean isFeatureAllowedForInsurance(String featureName, String insuranceBillingValue) {
+        Integer minIdx = FEATURE_MIN_INSURANCE_INDEX.get(featureName);
+        if (minIdx == null) {
+            return true;
+        }
+        return insuranceIndexFromValue(insuranceBillingValue) >= minIdx;
+    }
+
+    private synchronized void enforceInsuranceConstraints(String insuranceBillingValue) {
+        List<String> deactivated = new ArrayList<>();
+        List<String> activated = new ArrayList<>();
+
+        for (String feature : new HashSet<>(activeFeatures)) {
+            if (isMandatory(feature)) {
+                continue;
+            }
+            if (!isFeatureAllowedForInsurance(feature, insuranceBillingValue)) {
+                if (activeFeatures.remove(feature)) {
+                    deactivated.add(feature);
+                    insuranceDisabledFeatures.add(feature);
+                }
+            }
+        }
+
+        // If insurance increased, restore any features we disabled only due to insurance.
+        for (String feature : new HashSet<>(insuranceDisabledFeatures)) {
+            if (isMandatory(feature)) {
+                insuranceDisabledFeatures.remove(feature);
+                continue;
+            }
+            if (isFeatureAllowedForInsurance(feature, insuranceBillingValue) && !activeFeatures.contains(feature)) {
+                activeFeatures.add(feature);
+                insuranceDisabledFeatures.remove(feature);
+                activated.add(feature);
+            }
+        }
+
+        if (!deactivated.isEmpty()) {
+            notifyObserversFeatureDeactivated(deactivated);
+        }
+        if (!activated.isEmpty()) {
+            notifyObserversFeatureActivated(activated);
+        }
+    }
     
     private FeatureManager() {
         this.activeFeatures = new HashSet<>();
         this.observers = new CopyOnWriteArrayList<>();
         this.featureAttributes = new ConcurrentHashMap<>();
-        this.insuranceLevel = InsuranceLevel.NORMAL;
         
-        // Initialize default active features (mandatory ones)
         initializeDefaultFeatures();
     }
     
@@ -125,6 +223,7 @@ public class FeatureManager {
             }
             if (activeFeatures.remove(feature)) {
                 deactivated.add(feature);
+                insuranceDisabledFeatures.remove(feature);
             }
         }
         if (!deactivated.isEmpty()) {
@@ -158,22 +257,6 @@ public class FeatureManager {
      */
     public boolean isMandatory(String feature) {
         return Set.of("Book", "Cancel", "Complete", "PastConsultations").contains(feature);
-    }
-    
-    /**
-     * Sets the insurance level and adjusts available features.
-     * Insurance level affects feature availability and behavior.
-     */
-    public synchronized void setInsuranceLevel(InsuranceLevel level) {
-        this.insuranceLevel = level;
-        notifyObserversInsuranceLevelChanged(level);
-    }
-    
-    /**
-     * Gets the current insurance level.
-     */
-    public InsuranceLevel getInsuranceLevel() {
-        return insuranceLevel;
     }
     
     /**
@@ -221,11 +304,11 @@ public class FeatureManager {
     private void notifyObserversFeatureDeactivated(List<String> features) {
         forEachObserver(o -> o.onFeaturesDeactivated(features));
     }
-    
+
     /**
      * Notifies observers of insurance level change.
      */
-    private void notifyObserversInsuranceLevelChanged(InsuranceLevel level) {
+    private void notifyObserversInsuranceLevelChanged(String level) {
         forEachObserver(o -> o.onInsuranceLevelChanged(level));
     }
     
@@ -239,6 +322,15 @@ public class FeatureManager {
         featureAttributes
             .computeIfAbsent(featureName, k -> new ConcurrentHashMap<>())
             .put(attributeName, attributeValue);
+
+        // Insurance level is stored as a plain string in the InsuranceBilling feature attribute.
+        if ("InsuranceBilling".equals(featureName) && "value".equals(attributeName) && attributeValue != null) {
+            String raw = String.valueOf(attributeValue).trim();
+            if (!raw.isEmpty()) {
+                notifyObserversInsuranceLevelChanged(raw);
+                enforceInsuranceConstraints(raw);
+            }
+        }
     }
     
     /**

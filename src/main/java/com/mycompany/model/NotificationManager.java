@@ -22,16 +22,16 @@ public class NotificationManager {
 
     public void registerObserver(NotificationObserver listener) {
         listeners.add(listener);
-        logger.log("NotificationService", "Listener registered.");
+        logger.log("NotificationManager", "Listener registered.");
     }
 
     public void unregister(NotificationObserver listener) {
         listeners.remove(listener);
-        logger.log("NotificationService", "Listener unregistered.");
+        logger.log("NotificationManager", "Listener unregistered.");
     }
 
     public void send(Notification notification) {
-        logger.log("NotificationService", "Dispatching notification: " + notification.getTitle());
+        logger.log("NotificationManager", "Dispatching notification: " + notification.getTitle());
         for (NotificationObserver listener : listeners) {
             listener.onNotification(notification);
         }

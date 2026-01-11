@@ -21,5 +21,5 @@ public interface FeatureObserver {
     /**
      * Called when insurance level changes (affects feature availability).
      */
-    void onInsuranceLevelChanged(FeatureManager.InsuranceLevel level);
+    void onInsuranceLevelChanged(String level);
 }

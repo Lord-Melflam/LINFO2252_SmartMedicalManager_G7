@@ -4,12 +4,14 @@ import com.mycompany.data.Appointment;
 import com.mycompany.data.Notification;
 import com.mycompany.data.TimeEvent;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -19,22 +21,55 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AppointmentNotificationManager implements TimeEventObserver {
     private static final String TAG = "AppointmentNotificationService";
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     
     private final NotificationManager notificationManager;
     private final TimeEventManager timeEventManager;
     private final Logger logger = Logger.getInstance();
-    
+
     // Maps event IDs to their associated appointments and metadata
     private final Map<String, AppointmentEventData> eventRegistry = new ConcurrentHashMap<>();
-    
+
+    /**
+     * Returns upcoming appointments that currently have a scheduled reminder in the registry.
+     * This is primarily used by the Home screen to render a clickable "Upcoming reminders" list.
+     */
+    public List<Appointment> getUpcomingReminderAppointments(int limit) {
+        int effectiveLimit = (limit <= 0) ? Integer.MAX_VALUE : limit;
+        long now = System.currentTimeMillis();
+
+        Set<Appointment> unique = new HashSet<>();
+        for (AppointmentEventData data : eventRegistry.values()) {
+            if (data == null || data.eventType != EventType.REMINDER || data.appointment == null) {
+                continue;
+            }
+            Date dt = data.appointment.getDateAsDate();
+            if (dt == null) {
+                continue;
+            }
+            if (dt.getTime() >= now) {
+                unique.add(data.appointment);
+            }
+        }
+
+        List<Appointment> result = new ArrayList<>(unique);
+        result.sort(Comparator.comparing(a -> {
+            Date d = a.getDateAsDate();
+            return (d == null) ? new Date(Long.MAX_VALUE) : d;
+        }));
+
+        if (result.size() > effectiveLimit) {
+            return new ArrayList<>(result.subList(0, effectiveLimit));
+        }
+        return result;
+    }
+
     public AppointmentNotificationManager(NotificationManager notificationManager, TimeEventManager timeEventManager) {
         this.notificationManager = notificationManager;
         this.timeEventManager = timeEventManager;
         timeEventManager.registerListener(this);
         logger.log(TAG, "AppointmentNotificationService initialized and registered as listener.");
     }
-    
+
     /**
      * Handles fired time events - dispatches to appropriate notification handler.
      */
@@ -45,7 +80,7 @@ public class AppointmentNotificationManager implements TimeEventObserver {
             logger.log(TAG, "No registered handler for event: " + event.getId());
             return;
         }
-        
+
         switch (eventData.eventType) {
             case REMINDER:
                 sendAppointmentReminder(eventData.appointment, eventData.hoursBeforeAppointment);
@@ -56,90 +91,92 @@ public class AppointmentNotificationManager implements TimeEventObserver {
             default:
                 logger.log(TAG, "Unknown event type for: " + event.getId());
         }
-        
+
         // Clean up processed event
         eventRegistry.remove(event.getId());
     }
-    
+
     /**
      * Schedules a reminder for an appointment.
-     * @param appointment The appointment to remind about
+     *
+     * @param appointment              The appointment to remind about
      * @param hoursBeforeAppointment How many hours before the appointment to send reminder
      */
     public void scheduleAppointmentReminder(Appointment appointment, int hoursBeforeAppointment) {
         try {
-            Date reminderDate = Date.from(
-                LocalDateTime.of(
-                    LocalDate.parse(appointment.getDate(), DATE_FORMATTER),
-                    LocalTime.parse(appointment.getTime())
-                ).minusHours(hoursBeforeAppointment)
-                .atZone(java.time.ZoneId.systemDefault())
-                .toInstant()
-            );
-            
-            String eventId = "reminder_" + appointment.getDate() + "_" + hoursBeforeAppointment + "h";
+            if (hoursBeforeAppointment < 0) {
+                logger.logError(TAG, "hoursBeforeAppointment must be >= 0");
+                return;
+            }
+
+            Date appointmentDateTime = appointment.getDateAsDate();
+            long reminderMillis = appointmentDateTime.getTime() - (hoursBeforeAppointment * 3600_000L);
+            Date reminderTime = new Date(reminderMillis);
+
+            String eventId = "reminder_" + appointment.getDate() + "_" + appointment.getTime() + "_" + hoursBeforeAppointment + "h";
             String description = "Reminder for appointment with " + appointment.getDoctor();
-            
-            TimeEvent reminderEvent = new TimeEvent(eventId, reminderDate, description);
-            
+
+            TimeEvent reminderEvent = new TimeEvent(eventId, reminderTime, description);
+
             // Register event metadata
             AppointmentEventData eventData = new AppointmentEventData();
             eventData.eventType = EventType.REMINDER;
             eventData.appointment = appointment;
             eventData.hoursBeforeAppointment = hoursBeforeAppointment;
             eventRegistry.put(eventId, eventData);
-            
+
             timeEventManager.schedule(reminderEvent);
             logger.log(TAG, "Scheduled reminder for appointment " + appointment.getDate() + " " + appointment.getTime() +
-                       " at " + reminderDate + " (" + hoursBeforeAppointment + "h before)");
+                    " at " + reminderTime + " (" + hoursBeforeAppointment + "h before)");
         } catch (Exception e) {
             logger.logError(TAG, "Failed to schedule reminder for appointment " + appointment.getDate() + " " + appointment.getTime() + ": " + e.getMessage());
         }
     }
-    
+
     /**
      * Sends an immediate reminder notification for an appointment.
      */
     private void sendAppointmentReminder(Appointment appointment, int hoursBeforeAppointment) {
         String title = "Appointment Reminder";
         String message = String.format(
-            "Your appointment with %s is in %d hour(s).\nDate: %s at %s\nLocation: %s",
-            appointment.getDoctor(),
-            hoursBeforeAppointment,
-            appointment.getDate(),
-            appointment.getTime(),
-            appointment.getLocation()
+                "Your appointment with %s is in %d hour(s).\nDate: %s at %s\nLocation: %s",
+                appointment.getDoctor(),
+                hoursBeforeAppointment,
+                appointment.getDate(),
+                appointment.getTime(),
+                appointment.getLocation()
         );
-        
+
         Notification notification = new Notification(title, message, System.currentTimeMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent appointment reminder: " + appointment.getDate() + " " + appointment.getTime() +
-                   " with " + appointment.getDoctor());
+                " with " + appointment.getDoctor());
     }
-    
+
     /**
      * Sends a cancellation notice for an appointment (doctor/user can't make it).
+     *
      * @param appointment The cancelled appointment
      * @param cancelledBy Who cancelled (doctor/user)
-     * @param reason Optional reason for cancellation
+     * @param reason     Optional reason for cancellation
      */
     public void sendCancellationNotice(Appointment appointment, String cancelledBy, String reason) {
         String title = "Appointment Cancelled";
         String message = String.format(
-            "Your appointment with %s on %s at %s has been cancelled.\nCancelled by: %s%s",
-            appointment.getDoctor(),
-            appointment.getDate(),
-            appointment.getTime(),
-            cancelledBy,
-            reason != null && !reason.isEmpty() ? "\nReason: " + reason : ""
+                "Your appointment with %s on %s at %s has been cancelled.\nCancelled by: %s%s",
+                appointment.getDoctor(),
+                appointment.getDate(),
+                appointment.getTime(),
+                cancelledBy,
+                reason != null && !reason.isEmpty() ? "\nReason: " + reason : ""
         );
-        
+
         Notification notification = new Notification(title, message, System.currentTimeMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent cancellation notice for appointment " + appointment.getDate() + " " + appointment.getTime() +
-                   " (cancelled by " + cancelledBy + ")");
+                " (cancelled by " + cancelledBy + ")");
     }
-    
+
     /**
      * Schedules a cancellation notice to be sent at a specific time.
      * Useful for advance notice of unavailability.
@@ -147,9 +184,9 @@ public class AppointmentNotificationManager implements TimeEventObserver {
     public void scheduleCancellationNotice(Appointment appointment, String cancelledBy, String reason, Date noticeTime) {
         String eventId = "cancellation_" + appointment.getDate() + "_" + appointment.getTime();
         String description = "Cancellation notice for appointment with " + appointment.getDoctor();
-        
+
         TimeEvent cancellationEvent = new TimeEvent(eventId, noticeTime, description);
-        
+
         // Register event metadata
         AppointmentEventData eventData = new AppointmentEventData();
         eventData.eventType = EventType.CANCELLATION;
@@ -157,56 +194,56 @@ public class AppointmentNotificationManager implements TimeEventObserver {
         eventData.cancelledBy = cancelledBy;
         eventData.reason = reason;
         eventRegistry.put(eventId, eventData);
-        
+
         timeEventManager.schedule(cancellationEvent);
         logger.log(TAG, "Scheduled cancellation notice for appointment " + appointment.getDate() + " " + appointment.getTime() +
-                   " at " + noticeTime);
+                " at " + noticeTime);
     }
-    
+
     /**
      * Sends an immediate unavailability notice (doctor can't make it on short notice).
      */
     public void sendDoctorUnavailableNotice(Appointment appointment, String reason) {
         String title = "Doctor Unavailable";
         String message = String.format(
-            "Dr. %s is unable to attend your appointment on %s at %s.\n%s\nPlease contact the office to reschedule.",
-            appointment.getDoctor(),
-            appointment.getDate(),
-            appointment.getTime(),
-            reason != null && !reason.isEmpty() ? "Reason: " + reason : "Please reschedule at your earliest convenience."
+                "Dr. %s is unable to attend your appointment on %s at %s.\n%s\nPlease contact the office to reschedule.",
+                appointment.getDoctor(),
+                appointment.getDate(),
+                appointment.getTime(),
+                reason != null && !reason.isEmpty() ? "Reason: " + reason : "Please reschedule at your earliest convenience."
         );
-        
+
         Notification notification = new Notification(title, message, System.currentTimeMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent doctor unavailable notice for appointment " + appointment.getDate() + " " + appointment.getTime());
     }
-    
+
     /**
      * Sends a rescheduling suggestion notification.
      */
     public void sendRescheduleNotification(Appointment appointment, String suggestedDate, String suggestedTime) {
         String title = "Reschedule Appointment";
         String message = String.format(
-            "Your appointment with %s on %s at %s needs to be rescheduled.\nSuggested new time: %s at %s\nPlease confirm or contact the office.",
-            appointment.getDoctor(),
-            appointment.getDate(),
-            appointment.getTime(),
-            suggestedDate,
-            suggestedTime
+                "Your appointment with %s on %s at %s needs to be rescheduled.\nSuggested new time: %s at %s\nPlease confirm or contact the office.",
+                appointment.getDoctor(),
+                appointment.getDate(),
+                appointment.getTime(),
+                suggestedDate,
+                suggestedTime
         );
-        
+
         Notification notification = new Notification(title, message, System.currentTimeMillis());
         notificationManager.send(notification);
         logger.log(TAG, "Sent reschedule notification for appointment " + appointment.getDate() + " " + appointment.getTime());
     }
-    
+
     // Internal data structures
-    
+
     private enum EventType {
         REMINDER,
         CANCELLATION
     }
-    
+
     private static class AppointmentEventData {
         EventType eventType;
         Appointment appointment;

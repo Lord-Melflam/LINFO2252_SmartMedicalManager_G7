@@ -68,19 +68,44 @@ public class Appointment {
     }
 
     public Date getDateAsDate() {
-        try {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
-            sdf.setLenient(false);
-            return sdf.parse(this.date);
-        } catch (Exception e) {
+        if (this.date == null) {
             return null;
+        }
+
+        try {
+            String trimmedTime = (this.time == null) ? "" : this.time.trim();
+            if (!trimmedTime.isEmpty()) {
+                java.text.SimpleDateFormat dateTimeFormat = new java.text.SimpleDateFormat("dd-MM-yyyy HH:mm");
+                dateTimeFormat.setLenient(false);
+                return dateTimeFormat.parse(this.date.trim() + " " + trimmedTime);
+            }
+
+            java.text.SimpleDateFormat dateFormat = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            dateFormat.setLenient(false);
+            return dateFormat.parse(this.date.trim());
+        } catch (Exception e) {
+            try {
+                java.text.SimpleDateFormat dateFormat = new java.text.SimpleDateFormat("dd-MM-yyyy");
+                dateFormat.setLenient(false);
+                return dateFormat.parse(this.date.trim());
+            } catch (Exception ignored) {
+                return null;
+            }
         }
     }
 
     public void setDateFromDate(Date date) {
+        if (date == null) {
+            this.date = null;
+            this.time = null;
+            return;
+        }
+
         try {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
-            this.date = sdf.format(date);
+            java.text.SimpleDateFormat dateFormat = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            java.text.SimpleDateFormat timeFormat = new java.text.SimpleDateFormat("HH:mm");
+            this.date = dateFormat.format(date);
+            this.time = timeFormat.format(date);
         } catch (Exception e) {
             // Ignore
         }

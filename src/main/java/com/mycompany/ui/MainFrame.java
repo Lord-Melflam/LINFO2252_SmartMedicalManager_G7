@@ -22,13 +22,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 /**
@@ -54,6 +48,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private boolean showUpcomingOnHome = true; // Toggle for home page appointments
     private Appointment appointmentBeingModified = null; // Track which appointment is being edited
     private AppointmentNotificationManager appointmentNotificationManager;
+    private java.util.List<Appointment> homeReminderAppointments = java.util.List.of();
+    private boolean homeReminderListListenerInstalled = false;
     private NotificationManager notificationManager;
     private TimeEventManager timeEventManager;
     private DefaultListModel<String> notificationListModel;
@@ -97,7 +93,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         populateDropdowns();
         initializeTimePicker();
         updateProfileDisplay();
-        initializeFeatureCheckboxes();
         updateHomePageAppointments();
         buildAdminFeatureControls();
         refreshFeatureUI();
@@ -263,11 +258,46 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
             javax.swing.JPanel row = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 8, 2));
             javax.swing.JCheckBox toggle = new javax.swing.JCheckBox(feature);
+            try {
+                FeatureManager.ChoiceDefinition def = FeatureManager.getChoiceDefinition(feature);
+                if (def != null && !def.getChoices().isEmpty()) {
+                    toggle.setToolTipText("Choices: " + def.getChoices());
+                }
+            } catch (Exception ignored) {
+                // Keep UI resilient
+            }
             toggle.setSelected(featureManager.isFeatureActive(feature));
             toggle.addActionListener(e -> handleFeatureToggle(feature, toggle.isSelected(), toggle));
 
             javax.swing.JButton configBtn = new javax.swing.JButton("Configure");
             configBtn.addActionListener(e -> {
+                FeatureManager.ChoiceDefinition def;
+                try {
+                    def = FeatureManager.getChoiceDefinition(feature);
+                } catch (Exception ex) {
+                    def = null;
+                }
+
+                if (def != null && !def.getChoices().isEmpty()) {
+                    Object existing = featureManager.getFeatureAttribute(feature, "value");
+                    String existingStr = (existing == null) ? null : String.valueOf(existing);
+
+                    Object selected = javax.swing.JOptionPane.showInputDialog(
+                        this,
+                        "Select value for " + feature + ":",
+                        "Configure " + feature,
+                        javax.swing.JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        def.getChoices().toArray(new String[0]),
+                        existingStr
+                    );
+
+                    if (selected != null) {
+                        featureManager.setFeatureAttribute(feature, "value", String.valueOf(selected));
+                    }
+                    return;
+                }
+
                 Object existing = featureManager.getFeatureAttribute(feature, "value");
                 String val = javax.swing.JOptionPane.showInputDialog(this, "Set value for " + feature, existing);
                 if (val != null) {
@@ -353,9 +383,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         jLabel18 = new javax.swing.JLabel();
         jScrollPane3 = new javax.swing.JScrollPane();
         jTextArea2 = new javax.swing.JTextArea();
-        settingsTab = new javax.swing.JPanel();
         jScrollPane1 = new javax.swing.JScrollPane();
-        featurePanel = new javax.swing.JPanel();
+
         jCheckBox5 = new javax.swing.JCheckBox();
         jCheckBox4 = new javax.swing.JCheckBox();
         jCheckBox1 = new javax.swing.JCheckBox();
@@ -772,120 +801,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
         mainTabs.addTab("Profile", profileTab);
 
-        featurePanel.setLayout(new java.awt.GridLayout(0, 1));
-
-        jCheckBox5.setText("jCheckBox5");
-        featurePanel.add(jCheckBox5);
-
-        jCheckBox4.setText("jCheckBox4");
-        featurePanel.add(jCheckBox4);
-
-        jCheckBox1.setText("jCheckBox1");
-        featurePanel.add(jCheckBox1);
-
-        jCheckBox6.setText("jCheckBox6");
-        featurePanel.add(jCheckBox6);
-
-        jCheckBox3.setText("jCheckBox3");
-        featurePanel.add(jCheckBox3);
-
-        jScrollPane1.setViewportView(featurePanel);
-
-        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        jComboBox1.addActionListener(this::jComboBox1ActionPerformed);
-
-        jLabel1.setText("Theme");
-
-        jLabel3.setText("Option2");
-
-        jComboBox2.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        jLabel4.setText("Option3");
-
-        jComboBox3.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        jLabel5.setText("Option4");
-
-        jComboBox4.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        jComboBox5.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        jLabel17.setText("Option5");
-
-        javax.swing.GroupLayout settingsTabLayout = new javax.swing.GroupLayout(settingsTab);
-        settingsTab.setLayout(settingsTabLayout);
-        settingsTabLayout.setHorizontalGroup(
-                settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                .addContainerGap()
-                                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 158, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                                .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(jComboBox2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                                .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(jComboBox3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                                .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(jComboBox4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                                .addComponent(jLabel17, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(jComboBox5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                .addContainerGap(467, Short.MAX_VALUE))
-        );
-        settingsTabLayout.setVerticalGroup(
-                settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                .addContainerGap()
-                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(jScrollPane1)
-                                        .addGroup(settingsTabLayout.createSequentialGroup()
-                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                                        .addComponent(jComboBox1)
-                                                        .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                                        .addComponent(jComboBox2)
-                                                        .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                                        .addComponent(jComboBox3)
-                                                        .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                                        .addComponent(jComboBox4)
-                                                        .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addGroup(settingsTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                                        .addComponent(jComboBox5)
-                                                        .addComponent(jLabel17, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                                .addGap(0, 566, Short.MAX_VALUE)))
-                                .addContainerGap())
-        );
-
-        mainTabs.addTab("Settings", settingsTab);
-
-        jTextField1.setHorizontalAlignment(javax.swing.JTextField.CENTER);
-        jTextField1.setText("OptionName");
-        jTextField1.addActionListener(this::jTextField1ActionPerformed);
-
-        jButton4.setActionCommand("addOption");
-        jButton4.setLabel("Add Option");
-
-        jComboBox6.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Consultation Type", "Location", "Staff", "Room Type" }));
-        jComboBox6.setAutoscrolls(true);
-        jComboBox6.setRequestFocusEnabled(false);
-
         jLabel19.setText("Time Event System");
 
         adminFeaturePanel.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
@@ -1145,11 +1060,27 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
             jPanel2.removeAll();
 
+            if (!homeReminderListListenerInstalled) {
+                homeReminderListListenerInstalled = true;
+                jList1.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+                jList1.addMouseListener(new java.awt.event.MouseAdapter() {
+                    @Override
+                    public void mouseClicked(java.awt.event.MouseEvent e) {
+                        if (e.getClickCount() == 2) {
+                            int idx = jList1.locationToIndex(e.getPoint());
+                            if (idx >= 0 && idx < homeReminderAppointments.size()) {
+                                navigateToAppointment(homeReminderAppointments.get(idx));
+                            }
+                        }
+                    }
+                });
+            }
+
             if (appointments.isEmpty()) {
                 String emptyMessage = showUpcomingOnHome ?
                     "No upcoming appointments scheduled" :
                     "No past appointments found";
-                javax.swing.JLabel emptyLabel = new javax.swing.JLabel(emptyMessage);
+                JLabel emptyLabel = new JLabel(emptyMessage);
                 jPanel2.add(emptyLabel);
                 jLabel2.setVisible(showUpcomingOnHome);
                 notificationsRemindersList.setVisible(showUpcomingOnHome);
@@ -1172,8 +1103,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                         javax.swing.JLabel lbl = new javax.swing.JLabel(display);
                         javax.swing.JButton viewBtn = new javax.swing.JButton("View Details");
                         viewBtn.addActionListener(ev -> {
-                            mainTabs.setSelectedIndex(1); // Go to Appointments tab
-                            logger.log(TAG, "Navigated to Appointments tab from home page");
+                            navigateToAppointment(apt);
                         });
                         jPanel2.add(lbl);
                         jPanel2.add(viewBtn);
@@ -1182,8 +1112,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                         javax.swing.JLabel lbl = new javax.swing.JLabel(apt.getDate() + " at " + apt.getTime() + " with " + apt.getDoctor());
                         javax.swing.JButton viewBtn = new javax.swing.JButton("View Details");
                         viewBtn.addActionListener(ev -> {
-                            mainTabs.setSelectedIndex(1);
-                            logger.log(TAG, "Navigated to Appointments tab from home page");
+                            navigateToAppointment(apt);
                         });
                         jPanel2.add(lbl);
                         jPanel2.add(viewBtn);
@@ -1193,11 +1122,17 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 jLabel2.setVisible(showUpcomingOnHome);
                 notificationsRemindersList.setVisible(showUpcomingOnHome);
                 if (showUpcomingOnHome) {
-                    java.util.List<String> notifications = new java.util.ArrayList<>();
-                    for (Appointment apt : appointments) {
-                        notifications.add(apt.getDoctor() + " - " + apt.getDate() + " at " + apt.getTime());
+                    // Show upcoming appointments that have scheduled reminders.
+                    homeReminderAppointments = appointmentNotificationManager.getUpcomingReminderAppointments(10);
+                    if (homeReminderAppointments.isEmpty()) {
+                        jList1.setListData(new String[]{"No scheduled appointment reminders"});
+                    } else {
+                        java.util.List<String> reminders = new java.util.ArrayList<>();
+                        for (Appointment apt : homeReminderAppointments) {
+                            reminders.add(apt.getDoctor() + " - " + apt.getDate() + " at " + apt.getTime());
+                        }
+                        jList1.setListData(reminders.toArray(new String[0]));
                     }
-                    jList1.setListData(notifications.toArray(new String[0]));
                 } else {
                     jList1.setListData(new String[0]);
                 }
@@ -1210,6 +1145,40 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             logger.logError(TAG, "Error updating home page: " + e.getMessage());
         }
     }
+
+    private void navigateToAppointment(Appointment apt) {
+        if (apt == null) {
+            return;
+        }
+        mainTabs.setSelectedIndex(1); 
+        logger.log(TAG, "Navigated to Appointments tab from home page");
+
+        try {
+            // Ensure the appointment is visible (clear any search filter)
+            appointmentModel.clearFilter();
+            int rows = appointmentModel.getRowCount();
+            for (int i = 0; i < rows; i++) {
+                Appointment rowApt = appointmentModel.getAppointmentAt(i);
+                if (rowApt == apt) {
+                    appointmentsTable.getSelectionModel().setSelectionInterval(i, i);
+                    java.awt.Rectangle rect = appointmentsTable.getCellRect(i, 0, true);
+                    appointmentsTable.scrollRectToVisible(rect);
+                    return;
+                }
+                if (rowApt != null &&
+                    Objects.equals(rowApt.getDate(), apt.getDate()) &&
+                    Objects.equals(rowApt.getTime(), apt.getTime()) &&
+                    Objects.equals(rowApt.getDoctor(), apt.getDoctor())) {
+                    appointmentsTable.getSelectionModel().setSelectionInterval(i, i);
+                    java.awt.Rectangle rect = appointmentsTable.getCellRect(i, 0, true);
+                    appointmentsTable.scrollRectToVisible(rect);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+            // Best-effort navigation
+        }
+    }
     
     /**
      * Toggles between showing upcoming and past appointments on home page.
@@ -1218,48 +1187,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         showUpcomingOnHome = !showUpcomingOnHome;
         updateHomePageAppointments();
         logger.log(TAG, "Toggled to show " + (showUpcomingOnHome ? "upcoming" : "past") + " appointments");
-    }
-    
-    /**
-     * Initializes feature checkboxes with real feature names and listeners.
-     * Only shows Reminders. Hides Email, AdvancedSearch, and Fast.
-     */
-    private void initializeFeatureCheckboxes() {
-        java.util.List<javax.swing.JCheckBox> checkboxes = Arrays.asList(
-            jCheckBox1, jCheckBox3, jCheckBox4, jCheckBox5, jCheckBox6
-        );
-        
-        java.util.List<String> featureNames = Arrays.asList(
-            "Reminders", "AdvancedSearch", "Fast", "PatientView", "Email"
-        );
-        
-        // Features to show: indices 0 (Reminders) and 3 (PatientView)
-        java.util.List<Integer> featuresToShow = Arrays.asList(0, 3);
-        // Features to hide: indices 1 (AdvancedSearch), 2 (Fast), 4 (Email)
-        java.util.List<Integer> featuresToHide = Arrays.asList(1, 2, 4);
-        
-        // Hide and disable unwanted checkboxes
-        for (Integer idx : featuresToHide) {
-            checkboxes.get(idx).setVisible(false);
-            checkboxes.get(idx).setEnabled(false);
-        }
-        
-        // Setup visible features
-        for (Integer featureIdx : featuresToShow) {
-            javax.swing.JCheckBox checkbox = checkboxes.get(featureIdx);
-            String feature = featureNames.get(featureIdx);
-            
-            // Set proper label
-            checkbox.setText(feature);
-            checkbox.setVisible(true);
-            checkbox.setEnabled(true);
-            
-            // Set initial state
-            checkbox.setSelected(featureManager.isFeatureActive(feature));
-            
-            // Add listener for feature activation/deactivation
-            checkbox.addActionListener(e -> handleFeatureToggle(feature, checkbox.isSelected(), checkbox));
-        }
     }
     
     /**
@@ -1408,7 +1335,6 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                 appointmentBeingModified = null;
                 bookBtn.setText("Book");
             } else {
-                // CREATE MODE: New appointment
                 Appointment newAppointment = new Appointment(
                     dateStr, timeStr, doctor, loc, consultType, "Scheduled",
                     java.util.Map.of(
@@ -1660,27 +1586,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
      * @param args the command line arguments
      */
     public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
         FlatLightLaf.setup();
-
-//        try {
-//            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-//                logger.log(TAG, "Available Look and Feel: " + info.getName());
-//                if ("Metal".equals(info.getName())) {
-//                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-//                    //break;
-//                }
-//            }
-//        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
-//            logger.logError(TAG, "UI look and feel setup failed: " + ex.getMessage());
-//        }
-        //</editor-fold>
-
-        /* Create and display the form */
         java.awt.EventQueue.invokeLater(() -> new MainFrame().setVisible(true));
     }
     
@@ -1697,8 +1603,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     }
     
     @Override
-    public void onInsuranceLevelChanged(FeatureManager.InsuranceLevel level) {
+    public void onInsuranceLevelChanged(String level) {
         logger.log(TAG, "Insurance level changed to: " + level);
+        if (level != null && !level.trim().isEmpty()) {
+            patientManager.setInsuranceLevel(level.trim());
+        }
         updateProfileDisplay();
         // TODO: Update available appointment options based on insurance
     }

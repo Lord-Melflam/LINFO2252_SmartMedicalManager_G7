@@ -5,7 +5,6 @@ import java.util.*;
 /**
  * Singleton manager for patient profile data.
  * Handles user information, medical history, and billing information.
- * Implements Observer pattern for MVC separation.
  */
 public class PatientManager {
     private static PatientManager instance;
@@ -39,7 +38,8 @@ public class PatientManager {
         patient.setAge(31);
         patient.setSex("M");
         patient.setContactMethod("Email");
-        patient.setInsuranceLevel(FeatureManager.InsuranceLevel.NORMAL);
+        Object insurance = FeatureManager.getInstance().getFeatureAttribute("InsuranceBilling", "value");
+        patient.setInsuranceLevel((insurance == null) ? "NORMAL" : String.valueOf(insurance));
         patient.setCurrentMedication("Aspirin 100mg daily");
         patient.setVaccines("COVID-19, Flu");
         
@@ -79,7 +79,7 @@ public class PatientManager {
     /**
      * Updates insurance level and notifies observers.
      */
-    public synchronized void setInsuranceLevel(FeatureManager.InsuranceLevel level) {
+    public synchronized void setInsuranceLevel(String level) {
         currentPatient.setInsuranceLevel(level);
         notifyObserversPatientUpdated();
     }
@@ -137,7 +137,7 @@ public class PatientManager {
         private String contactMethod;
         private String currentMedication;
         private String vaccines;
-        private FeatureManager.InsuranceLevel insuranceLevel;
+        private String insuranceLevel;
         private final List<MedicalHistoryEntry> medicalHistory;
         private final Map<String, Object> attributes; // For feature extensions
         
@@ -168,8 +168,8 @@ public class PatientManager {
         public String getVaccines() { return vaccines; }
         public void setVaccines(String vaccines) { this.vaccines = vaccines; }
         
-        public FeatureManager.InsuranceLevel getInsuranceLevel() { return insuranceLevel; }
-        public void setInsuranceLevel(FeatureManager.InsuranceLevel level) { this.insuranceLevel = level; }
+        public String getInsuranceLevel() { return insuranceLevel; }
+        public void setInsuranceLevel(String level) { this.insuranceLevel = level; }
         
         public List<MedicalHistoryEntry> getMedicalHistory() {
             return new ArrayList<>(medicalHistory);
