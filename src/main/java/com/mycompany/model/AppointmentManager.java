@@ -65,7 +65,7 @@ public class AppointmentManager implements TimeChangeObserver {
     
     /**
      * Initialize with sample data.
-     * TODO: Replace with database/file loading in production.
+     * TODO: Replace with db in prod!
      */
     private void initializeSampleData() {
         addAppointment(new Appointment(

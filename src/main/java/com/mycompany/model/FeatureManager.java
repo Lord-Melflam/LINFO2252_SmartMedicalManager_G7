@@ -50,7 +50,7 @@ public class FeatureManager {
     );
     
     private static final Set<String> MANDATORY_FEATURES = Set.of(
-        "Book", "Modify", "Cancel", "PastConsultations", "InsuranceBilling"
+        "Book", "Modify", "Cancel", "PastConsultations"
     );
 
     private static final Set<String> DEFAULT_FEATURES = Set.of(
@@ -86,10 +86,8 @@ public class FeatureManager {
     private static final Map<String, Integer> FEATURE_MIN_INSURANCE_INDEX = Map.of(
         // Room choice is only available from NORMAL and above
         "RoomType", InsuranceLevel.NORMAL.ordinal(),
-        "SharedRoom", InsuranceLevel.NORMAL.ordinal(),
-        // Private room is only available for PREMIUM
-        "PrivateRoom", InsuranceLevel.PREMIUM.ordinal()
-    );
+            "Personel", InsuranceLevel.PREMIUM.ordinal()
+            );
 
     /**
      * Returns the choice definition for a feature, or null if the feature is free-text.

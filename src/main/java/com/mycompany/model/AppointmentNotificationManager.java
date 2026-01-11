@@ -36,9 +36,15 @@ public class AppointmentNotificationManager implements TimeEventObserver {
      * This is primarily used by the Home screen to render a clickable "Upcoming reminders" list.
      */
     public List<Appointment> getUpcomingReminderAppointments(int limit) {
+        // If appointment reminders are disabled, actively clear any scheduled reminder events
+        // so we don't keep firing outdated reminders after runtime toggles.
         if (!isAppointmentRemindersEnabled()) {
+            cleanupOutdatedReminderEvents(true);
             return java.util.Collections.emptyList();
         }
+
+        // Also clean up any stale reminder entries (past appointment, cancelled/completed, etc.)
+        cleanupOutdatedReminderEvents(false);
 
         int effectiveLimit = (limit <= 0) ? Integer.MAX_VALUE : limit;
         long now = nowMillis();
@@ -69,6 +75,75 @@ public class AppointmentNotificationManager implements TimeEventObserver {
         return result;
     }
 
+    private void cleanupOutdatedReminderEvents(boolean cancelAll) {
+        long now = nowMillis();
+
+        for (Map.Entry<String, AppointmentEventData> entry : new ArrayList<>(eventRegistry.entrySet())) {
+            if (entry == null) {
+                continue;
+            }
+
+            String eventId = entry.getKey();
+            AppointmentEventData data = entry.getValue();
+            if (data == null) {
+                eventRegistry.remove(eventId);
+                continue;
+            }
+
+            if (data.eventType != EventType.REMINDER) {
+                continue;
+            }
+
+            if (cancelAll) {
+                try {
+                    timeEventManager.cancelScheduledEvent(eventId);
+                } catch (Exception ignored) {
+                }
+                eventRegistry.remove(eventId);
+                continue;
+            }
+
+            Appointment appt = data.appointment;
+            if (appt == null) {
+                try {
+                    timeEventManager.cancelScheduledEvent(eventId);
+                } catch (Exception ignored) {
+                }
+                eventRegistry.remove(eventId);
+                continue;
+            }
+
+            String status = appt.getStatus();
+            if (status != null && !"Scheduled".equalsIgnoreCase(status)) {
+                try {
+                    timeEventManager.cancelScheduledEvent(eventId);
+                } catch (Exception ignored) {
+                }
+                eventRegistry.remove(eventId);
+                continue;
+            }
+
+            Date appointmentDateTime = appt.getDateAsDate();
+            if (appointmentDateTime == null) {
+                try {
+                    timeEventManager.cancelScheduledEvent(eventId);
+                } catch (Exception ignored) {
+                }
+                eventRegistry.remove(eventId);
+                continue;
+            }
+
+            long reminderFireAt = appointmentDateTime.getTime() - (data.hoursBeforeAppointment * 3600_000L);
+            if (reminderFireAt < now || appointmentDateTime.getTime() < now) {
+                try {
+                    timeEventManager.cancelScheduledEvent(eventId);
+                } catch (Exception ignored) {
+                }
+                eventRegistry.remove(eventId);
+            }
+        }
+    }
+
     public static synchronized AppointmentNotificationManager getInstance() {
         if (instance == null) {
             instance = new AppointmentNotificationManager();
@@ -86,27 +161,19 @@ public class AppointmentNotificationManager implements TimeEventObserver {
     }
 
     private boolean isNotificationsEnabled() {
-        try {
-            return featureManager != null && featureManager.isFeatureActive("Notification");
-        } catch (Exception ignored) {
-            return true;
-        }
+        return featureManager != null && featureManager.isFeatureActive("Notification");
     }
 
     private boolean isAppointmentRemindersEnabled() {
-        try {
-            if (featureManager == null) {
-                return true;
-            }
-
-            if (!featureManager.isFeatureActive("Reminders")) {
-                return false;
-            }
-
-            return featureManager.isFeatureActive("AppointmentReminders");
-        } catch (Exception ignored) {
+        if (featureManager == null) {
             return true;
         }
+
+        if (!featureManager.isFeatureActive("Reminders")) {
+            return false;
+        }
+
+        return featureManager.isFeatureActive("AppointmentReminders");
     }
 
     private long nowMillis() {

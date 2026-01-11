@@ -29,7 +29,7 @@ public class PatientManager {
     
     /**
      * Creates a default patient with sample data.
-     * TODO: Replace with actual patient loading/creation.
+     * TODO: Replace with actual patient from db in prod!
      */
     private Patient createDefaultPatient() {
         Patient patient = new Patient();

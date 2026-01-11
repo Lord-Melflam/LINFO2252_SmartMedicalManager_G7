@@ -41,10 +41,6 @@ public class DataProvider {
         return instance;
     }
     
-    /**
-     * Initialize all available options.
-     * These should be loaded from configuration in production.
-     */
     private void initializeOptions() {
         // Consultation types - from feature diagram
         optionsMap.put(CATEGORY_CONSULTATION_TYPES, Arrays.asList(

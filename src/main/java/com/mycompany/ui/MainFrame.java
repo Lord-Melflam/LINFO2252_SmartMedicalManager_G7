@@ -27,7 +27,6 @@ import java.util.*;
 
 /**
  * Main application frame for the Smart Medical Manager.
- * Follows MVC pattern with separated concerns.
  * Observes Model changes and updates View accordingly.
  *
  * @author Ji
@@ -57,6 +56,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private final java.util.List<HomeFeedItem> homeFeedItems = new java.util.ArrayList<>();
     private final java.util.List<Notification> homeNotifications = new java.util.ArrayList<>();
     private static final int HOME_MAX_NOTIFICATIONS = 30;
+    private static final long HOME_NOTIFICATION_RETENTION_MILLIS = 24L * 60L * 60L * 1000L;
     private javax.swing.JScrollPane adminFeatureScroll;
     private javax.swing.JPanel adminFeaturePanel;
     private final Map<String, JPanel> adminFeatureRows = new HashMap<>();
@@ -119,6 +119,153 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         buildAdminFeatureControls();
         refreshFeatureUI();
         bindTimeEventSystem();
+        setupDemoConfigurationCombo();
+    }
+
+    private void setupDemoConfigurationCombo() {
+        if (configurationCombo == null) {
+            return;
+        }
+
+        // Keep this list short and presentation-friendly.
+        String[] presets = {
+            "Custom",
+            "Demo: Full Features",
+            "Demo: Minimal Insurance",
+            "Demo: No Notifications/Reminders",
+            "Demo: Reminders + Notifications",
+            "Demo: Search/Sort Off"
+        };
+
+        configurationCombo.setModel(new javax.swing.DefaultComboBoxModel<>(presets));
+        configurationCombo.setSelectedItem("Custom");
+
+        configurationCombo.addActionListener(e -> {
+            Object selected = configurationCombo.getSelectedItem();
+            if (selected == null) {
+                return;
+            }
+            String name = String.valueOf(selected);
+            if ("Custom".equalsIgnoreCase(name)) {
+                return;
+            }
+
+            applyDemoConfiguration(name);
+        });
+    }
+
+    private void applyDemoConfiguration(String name) {
+        if (featureManager == null) {
+            return;
+        }
+
+        // Reset all non-mandatory features to a known baseline.
+        resetOptionalFeatures();
+
+        switch (name) {
+            case "Demo: Full Features" -> {
+                for (String f : FeatureManager.getAvailableFeatures()) {
+                    if (!featureManager.isMandatory(f)) {
+                        try {
+                            featureManager.activateFeatures(f);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                // Sensible defaults for choice-based features.
+                try {
+                    featureManager.setFeatureAttribute("InsuranceBilling", "value", "PREMIUM");
+                    featureManager.setFeatureAttribute("Notification", "value", "IN_APP");
+                } catch (Exception ignored) {
+                }
+            }
+            case "Demo: Minimal Insurance" -> {
+                // Turn on most features but show mandatory insurance interaction disabling higher-tier options.
+                try {
+                    featureManager.activateFeatures(
+                        "Personel", "ConsultationType", "ConsultationLocation",
+                        "RoomType",
+                        "Search",
+                        "Sort", "SortByDate", "SortByType", "SortByService",
+                        "Reminders", "AppointmentReminders", "MedicationReminders",
+                        "Notification", "NotifyOnReschedule",
+                        "Re-scheduling",
+                        "CurrentMedication", "Vaccines"
+                    );
+                } catch (Exception ignored) {
+                }
+
+                try {
+                    featureManager.setFeatureAttribute("InsuranceBilling", "value", "MINIMAL");
+                    featureManager.setFeatureAttribute("Notification", "value", "IN_APP");
+                } catch (Exception ignored) {
+                }
+            }
+            case "Demo: No Notifications/Reminders" -> {
+                try {
+                    featureManager.activateFeatures(
+                        "Personel", "ConsultationType", "ConsultationLocation",
+                        "Search",
+                        "Sort", "SortByDate", "SortByType", "SortByService",
+                        "Re-scheduling"
+                    );
+                } catch (Exception ignored) {
+                }
+
+                try {
+                    featureManager.setFeatureAttribute("InsuranceBilling", "value", "NORMAL");
+                } catch (Exception ignored) {
+                }
+            }
+            case "Demo: Reminders + Notifications" -> {
+                try {
+                    featureManager.activateFeatures(
+                        "Reminders", "AppointmentReminders", "MedicationReminders",
+                        "Notification",
+                        "CurrentMedication"
+                    );
+                    featureManager.setFeatureAttribute("Notification", "value", "IN_APP");
+                } catch (Exception ignored) {
+                }
+            }
+            case "Demo: Search/Sort Off" -> {
+                try {
+                    featureManager.activateFeatures(
+                        "Personel", "ConsultationType", "ConsultationLocation",
+                        "Re-scheduling"
+                    );
+                    featureManager.setFeatureAttribute("InsuranceBilling", "value", "NORMAL");
+                } catch (Exception ignored) {
+                }
+            }
+            default -> {
+                // Unknown preset; keep whatever we already applied.
+            }
+        }
+
+        // Ensure UI reflects the new configuration immediately.
+        try {
+            refreshFeatureUI();
+            updateHomePageAppointments();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void resetOptionalFeatures() {
+        try {
+            for (String f : FeatureManager.getAvailableFeatures()) {
+                if (featureManager.isMandatory(f)) {
+                    continue;
+                }
+                if (featureManager.isFeatureActive(f)) {
+                    try {
+                        featureManager.deactivateFeatures(f);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void bindTimeEventSystem() {
@@ -175,7 +322,35 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             updateSearchByFeatures();
             updateProfileDisplay();
             updateHomePageAppointments();
+            syncAdminFeatureCheckboxes();
         });
+    }
+
+    private void syncAdminFeatureCheckboxes() {
+        if (featureManager == null || adminFeatureRows == null || adminFeatureRows.isEmpty()) {
+            return;
+        }
+
+        for (String feature : FeatureManager.getAvailableFeatures()) {
+            if (featureManager.isMandatory(feature)) {
+                continue;
+            }
+
+            JPanel row = adminFeatureRows.get(feature);
+            if (row == null) {
+                continue;
+            }
+
+            for (java.awt.Component c : row.getComponents()) {
+                if (c instanceof javax.swing.JCheckBox cb) {
+                    try {
+                        cb.setSelected(featureManager.isFeatureActive(feature));
+                    } catch (Exception ignored) {
+                        // Keep UI resilient
+                    }
+                }
+            }
+        }
     }
 
     private void updateSortingByFeatures() {
@@ -452,6 +627,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         jLabel19 = new javax.swing.JLabel();
         jCalendar1 = new com.toedter.calendar.JCalendar();
         adminTimePicker = new com.mycompany.ui.components.TimePickerPanel();
+        configurationLabel = new javax.swing.JLabel();
+        configurationCombo = new javax.swing.JComboBox<>();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -849,6 +1026,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
 
         jLabel19.setText("Time Event System");
 
+        configurationLabel.setText("Configuration");
+
         adminFeaturePanel.setLayout(new java.awt.GridLayout(0, 2, 8, 4));
         adminFeatureScroll.setViewportView(adminFeaturePanel);
         javax.swing.GroupLayout adminTabLayout = new javax.swing.GroupLayout(adminTab);
@@ -863,7 +1042,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                         .addGroup(adminTabLayout.createSequentialGroup()
                             .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addGap(18, 18, 18)
-                            .addComponent(adminTimePicker, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                            .addComponent(adminTimePicker, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGap(18, 18, 18)
+                            .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addComponent(configurationLabel)
+                                .addComponent(configurationCombo, javax.swing.GroupLayout.PREFERRED_SIZE, 220, javax.swing.GroupLayout.PREFERRED_SIZE))))
                                 .addContainerGap())
         );
         adminTabLayout.setVerticalGroup(
@@ -874,7 +1057,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                     .addGroup(adminTabLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addComponent(jCalendar1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(adminTimePicker, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addComponent(adminTimePicker, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(adminTabLayout.createSequentialGroup()
+                    .addComponent(configurationLabel)
+                    .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                    .addComponent(configurationCombo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(adminFeatureScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
                                 .addContainerGap())
@@ -1230,6 +1417,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
             return;
         }
 
+        pruneOutdatedHomeNotifications();
+
         homeFeedModel.clear();
         homeFeedItems.clear();
 
@@ -1287,6 +1476,27 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                     addHomeFeedItem(new HomeFeedItem(HomeFeedItemType.NOTIFICATION, display, null, n));
                 }
             }
+        }
+    }
+
+    private long simulatedNowMillis() {
+        try {
+            if (timeEventManager != null && timeEventManager.getDate() != null) {
+                return timeEventManager.getDate().getTime();
+            }
+        } catch (Exception ignored) {
+        }
+        return System.currentTimeMillis();
+    }
+
+    private void pruneOutdatedHomeNotifications() {
+        long now = simulatedNowMillis();
+        long cutoff = now - HOME_NOTIFICATION_RETENTION_MILLIS;
+
+        homeNotifications.removeIf(n -> n == null || n.getTimestamp() < cutoff);
+
+        if (homeNotifications.size() > HOME_MAX_NOTIFICATIONS) {
+            homeNotifications.subList(HOME_MAX_NOTIFICATIONS, homeNotifications.size()).clear();
         }
     }
 
@@ -1887,6 +2097,13 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         logger.log(TAG, "Notification received in UI: " + notification.getTitle());
 
         SwingUtilities.invokeLater(() -> {
+            pruneOutdatedHomeNotifications();
+
+            // Keep only the most recent medication reminder to avoid clutter.
+            String title = notification.getTitle();
+            if (title != null && title.equalsIgnoreCase("Medication Reminder")) {
+                homeNotifications.removeIf(n -> n != null && "Medication Reminder".equalsIgnoreCase(n.getTitle()));
+            }
             homeNotifications.add(0, notification);
             if (homeNotifications.size() > HOME_MAX_NOTIFICATIONS) {
                 homeNotifications.subList(HOME_MAX_NOTIFICATIONS, homeNotifications.size()).clear();
@@ -1951,6 +2168,8 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
     private javax.swing.JButton jButton6;
     private javax.swing.JButton jButton7;
     private com.toedter.calendar.JCalendar jCalendar1;
+    private javax.swing.JComboBox<String> configurationCombo;
+    private javax.swing.JLabel configurationLabel;
     private javax.swing.JCheckBox jCheckBox1;
     private javax.swing.JCheckBox jCheckBox3;
     private javax.swing.JCheckBox jCheckBox4;

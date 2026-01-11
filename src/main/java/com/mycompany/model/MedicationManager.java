@@ -97,19 +97,11 @@ public class MedicationManager implements TimeEventObserver, FeatureObserver, Ti
     }
 
     private boolean isMedicationReminderFeatureEnabled() {
-        try {
-            return featureManager.isFeatureActive("Reminders") && featureManager.isFeatureActive("MedicationReminders") && featureManager.isFeatureActive("CurrentMedication");
-        } catch (Exception ignored) {
-            return false;
-        }
+        return featureManager.isFeatureActive("Reminders") && featureManager.isFeatureActive("MedicationReminders") && featureManager.isFeatureActive("CurrentMedication");
     }
 
     private boolean isNotificationFeatureEnabled() {
-        try {
-            return featureManager.isFeatureActive("Notification");
-        } catch (Exception ignored) {
-            return false;
-        }
+        return featureManager.isFeatureActive("Notification");
     }
 
     private Date computeNextFireTime(Date now) {
