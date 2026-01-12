@@ -416,6 +416,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         items.add("Today");
         items.add("This Week");
         items.add("All Upcoming");
+        items.add("All");
         if (pastEnabled) {
             items.add("Past Appointments");
         }
@@ -737,10 +738,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         applyFilterBtn.addActionListener(this::applyFilterBtnActionPerformed);
 
         timePeriodList.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Today", "This Week", "All Upcoming", "Past Appointments" };
+            String[] strings = { "Today", "This Week", "All Upcoming", "Past Appointments", "All" };
             public int getSize() { return strings.length; }
             public String getElementAt(int i) { return strings[i]; }
         });
+        timePeriodList.setVisibleRowCount(5); // ensure the "All" option is visible without scrolling
 
         filterSeparator.setOrientation(javax.swing.SwingConstants.HORIZONTAL);
 
@@ -777,7 +779,7 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                                .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 78, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addComponent(timePeriodList, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addGap(14, 14, 14)
                                                 .addComponent(applyFilterBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
@@ -1964,6 +1966,9 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                             break;
                         case "Past Appointments":
                             include = aptDate.before(now);
+                            break;
+                        case "All":
+                            include = true;
                             break;
                     }
                     
