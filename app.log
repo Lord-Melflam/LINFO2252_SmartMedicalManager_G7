@@ -1,0 +1,242 @@
+[2025-12-15 19:46:42] [Logger] File logging enabled: app.log
+[2025-12-15 19:46:42] [View] Registered Themes:
+ - IntelliJ
+ - Solarized Light
+ - Darcula
+ - One Dark
+ - Solarized Dark
+ - High Contrast Light
+ - High Contrast Dark
+
+[2025-12-15 19:46:42] [View] Setting Dark Mode to true
+[2025-12-15 19:46:42] [View] Setting Title: SmartMedicalView
+[2025-12-15 19:46:42] [View] Displaying the Smart Medical Appointment Manager UI.
+[2025-12-15 19:46:42] [Controller] UI View enabled.
+[2025-12-15 19:46:42] [System] System Ready. Enter commands:
+[2025-12-15 19:46:42] [System] UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light
+[2025-12-15 19:46:42] [System] TES commands: day, week, event <name>
+[2025-12-15 19:46:42] [System] System command: stop
+[2025-12-15 19:46:42] [System] Features available:
+[2025-12-15 19:46:42] [System] Feature: APPOINTMENTS
+[2025-12-15 19:46:42] [System] Feature: MEDICAL_HISTORY
+[2025-12-15 19:46:42] [System] Feature: INSURANCE_LEVELS
+[2025-12-15 19:46:42] [System] Feature: PAYMENTS
+[2025-12-15 19:46:42] [System] Feature: REMINDERS
+[2025-12-15 19:46:42] [System] Feature: FAST_SCHEDULING
+[2025-12-15 19:46:42] [System] Feature: AUTOMATIC_RESCHEDULING
+[2025-12-15 19:46:42] [System] Feature: PREMIUM_SERVICE_ACCESS
+[2025-12-15 19:46:42] [System] Feature: DYNAMIC_BUTTON
+[2025-12-15 19:46:42] [System] Feature: DARK_MODE
+[2025-12-15 19:46:43] [Controller] getFutureAppointments: returning 0 appointments
+[2025-12-15 19:46:48] [View] Open booking panel
+[2025-12-15 19:46:49] [View] Book requested: patient=UI_User dateMs=1765824403465 offsetDays=0 day=2025-12-15
+[2025-12-15 19:46:49] [Model] Appointment added: Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:49] [Model] Notification added: Notification{id=de675e87-f4d3-4a1d-ba55-af7e1acf0b21, ts=2025-12-15T19:46:49.729792300, read=false, msg='Appointment added: Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}'}
+[2025-12-15 19:46:49] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:46:49] [View]   System Status: OPERATIONAL
+[2025-12-15 19:46:49] [View]   Active Features:
+[2025-12-15 19:46:49] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:46:49] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:46:49] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:46:49] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:46:49] [View]   Future Appointments:
+[2025-12-15 19:46:49] [View]   - Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:49] [View]   Past Appointments:
+[2025-12-15 19:46:49] [Controller] Directly added appointment for UI_User on day 2025-12-15
+[2025-12-15 19:46:49] [View] Book succeeded: patient=UI_User day=2025-12-15
+[2025-12-15 19:46:51] [Controller] getFutureAppointments: returning 1 appointments
+[2025-12-15 19:46:53] [View] Open booking panel
+[2025-12-15 19:46:55] [View] Book requested: patient=UI_User dateMs=1765910803465 offsetDays=1 day=2025-12-16
+[2025-12-15 19:46:55] [Model] Appointment added: Appointment{id=f202dd18-224e-4140-a791-014eb646255f, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:55] [Model] Notification added: Notification{id=776e0677-bfc2-4bf8-a54c-70c39a24187e, ts=2025-12-15T19:46:55.192414100, read=false, msg='Appointment added: Appointment{id=f202dd18-224e-4140-a791-014eb646255f, date=2025-12-16, patient=UI_User, staff=Dr. Stone}'}
+[2025-12-15 19:46:55] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:46:55] [View]   System Status: OPERATIONAL
+[2025-12-15 19:46:55] [View]   Active Features:
+[2025-12-15 19:46:55] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:46:55] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:46:55] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:46:55] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:46:55] [View]   Future Appointments:
+[2025-12-15 19:46:55] [View]   - Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:55] [View]   - Appointment{id=f202dd18-224e-4140-a791-014eb646255f, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:55] [View]   Past Appointments:
+[2025-12-15 19:46:55] [Controller] Directly added appointment for UI_User on day 2025-12-16
+[2025-12-15 19:46:55] [View] Book succeeded: patient=UI_User day=2025-12-16
+[2025-12-15 19:46:56] [Controller] getFutureAppointments: returning 2 appointments
+[2025-12-15 19:46:57] [View] Open booking panel
+[2025-12-15 19:46:59] [View] Book requested: patient=UI_User dateMs=1766342803465 offsetDays=6 day=2025-12-21
+[2025-12-15 19:46:59] [Model] Appointment added: Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-21, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:59] [Model] Notification added: Notification{id=69277db1-5297-486c-9d2f-5f6775992e57, ts=2025-12-15T19:46:59.761926400, read=false, msg='Appointment added: Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-21, patient=UI_User, staff=Dr. Stone}'}
+[2025-12-15 19:46:59] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:46:59] [View]   System Status: OPERATIONAL
+[2025-12-15 19:46:59] [View]   Active Features:
+[2025-12-15 19:46:59] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:46:59] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:46:59] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:46:59] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:46:59] [View]   Future Appointments:
+[2025-12-15 19:46:59] [View]   - Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:59] [View]   - Appointment{id=f202dd18-224e-4140-a791-014eb646255f, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:59] [View]   - Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-21, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:46:59] [View]   Past Appointments:
+[2025-12-15 19:46:59] [Controller] Directly added appointment for UI_User on day 2025-12-21
+[2025-12-15 19:46:59] [View] Book succeeded: patient=UI_User day=2025-12-21
+[2025-12-15 19:47:00] [Controller] getFutureAppointments: returning 3 appointments
+[2025-12-15 19:47:01] [View] Open booking panel
+[2025-12-15 19:47:03] [View] Book requested: patient=UI_User dateMs=1766429203465 offsetDays=7 day=2025-12-22
+[2025-12-15 19:47:03] [Model] Appointment added: Appointment{id=0ddcc814-09dc-4295-974e-c031477602b6, date=2025-12-22, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:03] [Model] Notification added: Notification{id=55df887a-96b5-4dc6-b645-8d27a47d1bd5, ts=2025-12-15T19:47:03.949458800, read=false, msg='Appointment added: Appointment{id=0ddcc814-09dc-4295-974e-c031477602b6, date=2025-12-22, patient=UI_User, staff=Dr. Stone}'}
+[2025-12-15 19:47:03] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:47:03] [View]   System Status: OPERATIONAL
+[2025-12-15 19:47:03] [View]   Active Features:
+[2025-12-15 19:47:03] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:47:03] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:47:03] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:47:03] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:47:03] [View]   Future Appointments:
+[2025-12-15 19:47:03] [View]   - Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:03] [View]   - Appointment{id=f202dd18-224e-4140-a791-014eb646255f, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:03] [View]   - Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-21, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:03] [View]   - Appointment{id=0ddcc814-09dc-4295-974e-c031477602b6, date=2025-12-22, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:03] [View]   Past Appointments:
+[2025-12-15 19:47:03] [Controller] Directly added appointment for UI_User on day 2025-12-22
+[2025-12-15 19:47:03] [View] Book succeeded: patient=UI_User day=2025-12-22
+[2025-12-15 19:47:05] [Controller] getFutureAppointments: returning 4 appointments
+[2025-12-15 19:47:08] [View] Modify requested, selectedRow=2
+[2025-12-15 19:47:10] [View] Reschedule requested: row=2 newDay=2
+[2025-12-15 19:47:10] [Controller] rescheduleAppointment requested: b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb -> 2025-12-17
+[2025-12-15 19:47:10] [Model] Rescheduled appointment: Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-21, patient=UI_User, staff=Dr. Stone} -> Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-17, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:10] [Model] Notification added: Notification{id=a4aca9d1-76dd-4191-a5d3-6d8380f1059c, ts=2025-12-15T19:47:10.965943400, read=false, msg='Appointment for UI_User rescheduled to 2025-12-17'}
+[2025-12-15 19:47:10] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:47:10] [View]   System Status: OPERATIONAL
+[2025-12-15 19:47:10] [View]   Active Features:
+[2025-12-15 19:47:10] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:47:10] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:47:10] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:47:10] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:47:10] [View]   Future Appointments:
+[2025-12-15 19:47:10] [View]   - Appointment{id=647d39e5-073b-4945-8455-7bb3220dede1, date=2025-12-15, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:10] [View]   - Appointment{id=f202dd18-224e-4140-a791-014eb646255f, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:10] [View]   - Appointment{id=b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb, date=2025-12-17, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:10] [View]   - Appointment{id=0ddcc814-09dc-4295-974e-c031477602b6, date=2025-12-22, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:47:10] [View]   Past Appointments:
+[2025-12-15 19:47:10] [Controller] Rescheduled appointment id b54a8a6c-b5a3-4fd0-b0b2-c21a3e3c75eb -> 2025-12-17
+[2025-12-15 19:47:10] [View] Reschedule succeeded: row=2 newDay=2
+[2025-12-15 19:47:12] [Controller] getFutureAppointments: returning 4 appointments
+[2025-12-15 19:47:55] [Logger] File logging enabled: app.log
+[2025-12-15 19:47:55] [View] Registered Themes:
+ - IntelliJ
+ - Solarized Light
+ - Darcula
+ - One Dark
+ - Solarized Dark
+ - High Contrast Light
+ - High Contrast Dark
+
+[2025-12-15 19:47:55] [View] Setting Dark Mode to true
+[2025-12-15 19:47:55] [View] Setting Title: SmartMedicalView
+[2025-12-15 19:47:55] [View] Displaying the Smart Medical Appointment Manager UI.
+[2025-12-15 19:47:55] [Controller] UI View enabled.
+[2025-12-15 19:47:55] [System] System Ready. Enter commands:
+[2025-12-15 19:47:55] [System] UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light
+[2025-12-15 19:47:55] [System] TES commands: day, week, event <name>
+[2025-12-15 19:47:55] [System] System command: stop
+[2025-12-15 19:47:55] [System] Features available:
+[2025-12-15 19:47:55] [System] Feature: APPOINTMENTS
+[2025-12-15 19:47:55] [System] Feature: MEDICAL_HISTORY
+[2025-12-15 19:47:55] [System] Feature: INSURANCE_LEVELS
+[2025-12-15 19:47:55] [System] Feature: PAYMENTS
+[2025-12-15 19:47:55] [System] Feature: REMINDERS
+[2025-12-15 19:47:55] [System] Feature: FAST_SCHEDULING
+[2025-12-15 19:47:55] [System] Feature: AUTOMATIC_RESCHEDULING
+[2025-12-15 19:47:55] [System] Feature: PREMIUM_SERVICE_ACCESS
+[2025-12-15 19:47:55] [System] Feature: DYNAMIC_BUTTON
+[2025-12-15 19:47:55] [System] Feature: DARK_MODE
+[2025-12-15 19:47:56] [Controller] getFutureAppointments: returning 0 appointments
+[2025-12-15 19:48:00] [View] Open booking panel
+[2025-12-15 19:48:01] [View] Book requested: patient=UI_User dateMs=1765910876495 offsetDays=1 day=2025-12-16
+[2025-12-15 19:48:01] [Model] Appointment added: Appointment{id=bbb90fc3-20f9-4714-a44b-d14dbc9dbd3c, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:48:01] [Model] Notification added: Notification{id=53db5774-f941-4169-aa43-22d66db3bdf3, ts=2025-12-15T19:48:01.621776400, read=false, msg='Appointment added: Appointment{id=bbb90fc3-20f9-4714-a44b-d14dbc9dbd3c, date=2025-12-16, patient=UI_User, staff=Dr. Stone}'}
+[2025-12-15 19:48:01] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:48:01] [View]   System Status: OPERATIONAL
+[2025-12-15 19:48:01] [View]   Active Features:
+[2025-12-15 19:48:01] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:48:01] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:48:01] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:48:01] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:48:01] [View]   Future Appointments:
+[2025-12-15 19:48:01] [View]   - Appointment{id=bbb90fc3-20f9-4714-a44b-d14dbc9dbd3c, date=2025-12-16, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:48:01] [View]   Past Appointments:
+[2025-12-15 19:48:01] [Controller] Directly added appointment for UI_User on day 2025-12-16
+[2025-12-15 19:48:01] [View] Book succeeded: patient=UI_User day=2025-12-16
+[2025-12-15 19:48:02] [Controller] getFutureAppointments: returning 1 appointments
+[2025-12-15 19:48:35] [Logger] File logging enabled: app.log
+[2025-12-15 19:48:35] [View] Registered Themes:
+ - IntelliJ
+ - Solarized Light
+ - Darcula
+ - One Dark
+ - Solarized Dark
+ - High Contrast Light
+ - High Contrast Dark
+
+[2025-12-15 19:48:35] [View] Setting Dark Mode to true
+[2025-12-15 19:48:35] [View] Setting Title: SmartMedicalView
+[2025-12-15 19:48:35] [View] Displaying the Smart Medical Appointment Manager UI.
+[2025-12-15 19:48:35] [Controller] UI View enabled.
+[2025-12-15 19:48:35] [System] System Ready. Enter commands:
+[2025-12-15 19:48:35] [System] UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light
+[2025-12-15 19:48:35] [System] TES commands: day, week, event <name>
+[2025-12-15 19:48:35] [System] System command: stop
+[2025-12-15 19:48:35] [System] Features available:
+[2025-12-15 19:48:35] [System] Feature: APPOINTMENTS
+[2025-12-15 19:48:35] [System] Feature: MEDICAL_HISTORY
+[2025-12-15 19:48:35] [System] Feature: INSURANCE_LEVELS
+[2025-12-15 19:48:35] [System] Feature: PAYMENTS
+[2025-12-15 19:48:35] [System] Feature: REMINDERS
+[2025-12-15 19:48:35] [System] Feature: FAST_SCHEDULING
+[2025-12-15 19:48:35] [System] Feature: AUTOMATIC_RESCHEDULING
+[2025-12-15 19:48:35] [System] Feature: PREMIUM_SERVICE_ACCESS
+[2025-12-15 19:48:35] [System] Feature: DYNAMIC_BUTTON
+[2025-12-15 19:48:35] [System] Feature: DARK_MODE
+[2025-12-15 19:48:36] [Controller] getFutureAppointments: returning 0 appointments
+[2025-12-15 19:48:39] [View] Open booking panel
+[2025-12-15 19:48:44] [View] Modify requested, selectedRow=-1
+[2025-12-15 19:48:45] [View] Open booking panel
+[2025-12-15 19:48:47] [View] Book requested: patient=UI_User dateMs=1765997316391 offsetDays=2 day=2025-12-17
+[2025-12-15 19:48:47] [Model] Appointment added: Appointment{id=3aecc961-44da-412c-8ee0-e950d803adb0, date=2025-12-17, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:48:47] [Model] Notification added: Notification{id=c256d06c-da2e-43fd-84ca-37bedff45ea7, ts=2025-12-15T19:48:47.289847800, read=false, msg='Appointment added: Appointment{id=3aecc961-44da-412c-8ee0-e950d803adb0, date=2025-12-17, patient=UI_User, staff=Dr. Stone}'}
+[2025-12-15 19:48:47] [View] UPDATING DISPLAY based on new configuration:
+[2025-12-15 19:48:47] [View]   System Status: OPERATIONAL
+[2025-12-15 19:48:47] [View]   Active Features:
+[2025-12-15 19:48:47] [View]   - INSURANCE_LEVELS (Varying Insurance Levels)
+[2025-12-15 19:48:47] [View]   - APPOINTMENTS (Appointment Management)
+[2025-12-15 19:48:47] [View]   - MEDICAL_HISTORY (Personal Medical History)
+[2025-12-15 19:48:47] [View]   - PAYMENTS (Payment Management)
+[2025-12-15 19:48:47] [View]   Future Appointments:
+[2025-12-15 19:48:47] [View]   - Appointment{id=3aecc961-44da-412c-8ee0-e950d803adb0, date=2025-12-17, patient=UI_User, staff=Dr. Stone}
+[2025-12-15 19:48:47] [View]   Past Appointments:
+[2025-12-15 19:48:47] [Controller] Directly added appointment for UI_User on day 2025-12-17
+[2025-12-15 19:48:47] [View] Book succeeded: patient=UI_User day=2025-12-17
+[2025-12-15 19:48:47] [Controller] getFutureAppointments: returning 1 appointments
+[2025-12-15 19:58:04] [Logger] File logging enabled: app.log
+[2025-12-15 19:58:04] [View] Setting Dark Mode to true
+[2025-12-15 19:58:04] [View] Setting Title: SmartMedicalView
+[2025-12-15 19:58:04] [View] Displaying the Smart Medical Appointment Manager UI.
+[2025-12-15 19:58:04] [Controller] UI View enabled.
+[2025-12-15 19:58:04] [System] System Ready. Enter commands:
+[2025-12-15 19:58:04] [System] UI commands: title <text>, add, remove, activate <feature1...>, deactivate <feature1...>, dark, light
+[2025-12-15 19:58:04] [System] TES commands: day, week, event <name>
+[2025-12-15 19:58:04] [System] System command: stop
+[2025-12-15 19:58:04] [System] Features available:
+[2025-12-15 19:58:04] [System] Feature: APPOINTMENTS
+[2025-12-15 19:58:04] [System] Feature: MEDICAL_HISTORY
+[2025-12-15 19:58:04] [System] Feature: INSURANCE_LEVELS
+[2025-12-15 19:58:04] [System] Feature: PAYMENTS
+[2025-12-15 19:58:04] [System] Feature: REMINDERS
+[2025-12-15 19:58:04] [System] Feature: FAST_SCHEDULING
+[2025-12-15 19:58:04] [System] Feature: AUTOMATIC_RESCHEDULING
+[2025-12-15 19:58:04] [System] Feature: PREMIUM_SERVICE_ACCESS
+[2025-12-15 19:58:04] [System] Feature: DYNAMIC_BUTTON
+[2025-12-15 19:58:04] [System] Feature: DARK_MODE
+[2025-12-15 19:58:06] [Controller] getFutureAppointments: returning 0 appointments
