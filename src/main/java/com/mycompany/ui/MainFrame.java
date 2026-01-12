@@ -710,11 +710,15 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
         appointmentsTableScroll.setViewportView(appointmentsTable);
         appointmentsTable.getColumnModel().getSelectionModel().setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         if (appointmentsTable.getColumnModel().getColumnCount() > 0) {
+            /*
             appointmentsTable.getColumnModel().getColumn(0).setResizable(false);
             appointmentsTable.getColumnModel().getColumn(1).setResizable(false);
             appointmentsTable.getColumnModel().getColumn(2).setResizable(false);
             appointmentsTable.getColumnModel().getColumn(3).setResizable(false);
             appointmentsTable.getColumnModel().getColumn(4).setResizable(false);
+            */
+           //table limits removed to allow resizing
+            appointmentsTable.getColumnModel().getColumn(5).setResizable(false);
         }
 
         newBtn.setText("New Appointment");
@@ -1968,6 +1972,11 @@ public class MainFrame extends javax.swing.JFrame implements FeatureObserver, Pa
                             include = aptDate.before(now);
                             break;
                         case "All":
+                            include = aptDate.equals(now) ||
+                                      (!aptDate.before(now) && !aptDate.after(new Date(now.getTime() + 7L * 24 * 60 * 60 * 1000))) ||
+                                      !aptDate.before(now) ||
+                                      aptDate.before(now);
+                            // the include here doesn't handle upcoming date. I want all dates, how to
                             include = true;
                             break;
                     }
